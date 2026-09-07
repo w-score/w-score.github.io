@@ -1,0 +1,32 @@
+/* 共通スタイル（本文のHTMLには手を加えず、外側と色だけ整えています） */
+:root{
+  --lime:#e4f3c4;      /* 少し白みがかったソフトなライムグリーン（メニュー背景） */
+  --lime-deep:#8cc63f; /* メニュー下の線 */
+  --green:#2e7d32;     /* 見出し・リンクのグリーン */
+  --green-dark:#1b5e20;
+}
+body{margin:0;background:#fff;color:#111;font-family:"Meiryo","メイリオ","Hiragino Sans","Yu Gothic",system-ui,sans-serif}
+.site-nav{background:var(--lime);border-bottom:5px solid var(--lime-deep);padding:.55rem 1rem;display:flex;flex-wrap:wrap;align-items:center;gap:.3rem .9rem;font-size:.95rem;line-height:1.6}
+.site-nav .home{flex-basis:100%;color:var(--green-dark);font-weight:bold;text-decoration:none;font-size:1.05rem}
+.site-nav .grp{color:var(--green-dark);font-weight:bold}
+.site-nav a{color:var(--green);text-decoration:none;font-weight:bold;padding:.1rem .45rem;border-radius:3px}
+.site-nav a:hover{background:#fff}
+.site-nav a.current{background:var(--green);color:#fff}
+.site-main{max-width:58em;margin:0 auto;padding:1rem 1.25rem 2rem;overflow-x:auto}
+.site-main.wide{max-width:none}
+.site-main img{max-width:100%;height:auto}
+/* 旧HTMLの赤い見出し（<FONT color="RED">）をグリーンに */
+.site-main font[color="RED"],.site-main font[color="red"],.site-main font[color="#ff0000"],.site-main font[color="#FF0000"]{color:var(--green)}
+/* 赤い画像ロゴ（タイトル・ランナー）を色相回転でグリーンに */
+img[src*="title-gaku"],img[src*="title-nikkei"],img[src*="O-logo"],img[src*="runner"]{filter:hue-rotate(115deg) saturate(.85)}
+.site-footer{border-top:1px solid #ddd;margin-top:2rem;padding:1rem 1.25rem 2rem;text-align:center;font-size:.9rem;color:#555}
+.site-footer a{color:var(--green)}
+/* トップページ */
+.top-hero{text-align:center;padding:1.5rem 0 .5rem}
+.top-hero img{max-width:100%;height:auto}
+.toc{max-width:44em;margin:1.5rem auto;padding:0 1.25rem}
+.toc h2{font-size:1.15rem;border-left:8px solid var(--lime-deep);padding-left:.6rem;margin:2rem 0 .6rem;color:var(--green-dark)}
+.toc ol,.toc ul{margin:.3rem 0 0;padding-left:1.4em;line-height:2}
+.toc a{color:var(--green);font-weight:bold}
+.toc .lead{color:#444;line-height:1.8}
+.toc small{color:#666}
