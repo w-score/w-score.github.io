@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>スタートリスト</title>
+<style>
+:root{
+  --fg:#222; --bg:#fff; --line:#999; --muted:#666;
+  --panel:#f6f6f6; --accent:#2a6db0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+  font-family:"Noto Sans CJK JP","Noto Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;font-size:13px;line-height:1.35}
+body{padding:12px 16px}
+h1{font-size:18px;margin:0 0 6px}
+.sub{color:var(--muted);font-size:12px;margin-bottom:8px}
+.panel{background:var(--panel);border:1px solid #ddd;border-radius:6px;padding:8px 10px;margin-bottom:8px}
+.row{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.row+.row{margin-top:6px}
+label{white-space:nowrap}
+input[type=text],input[type=number],select{font:inherit;padding:3px 5px;border:1px solid #bbb;border-radius:4px;background:#fff}
+input[type=number]{width:56px}
+button{font:inherit;padding:4px 10px;border:1px solid #888;border-radius:4px;background:#fff;cursor:pointer}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button:hover{filter:brightness(0.95)}
+details summary{cursor:pointer;font-weight:bold}
+.classbox{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px}
+.classbox label{font-size:12px}
+.colorgrid{display:grid;grid-template-columns:max-content max-content max-content;gap:3px 14px;align-items:center;margin-top:6px;font-size:12px}
+.colorgrid .hd{font-weight:bold;color:var(--muted)}
+.cp{display:inline-flex;align-items:center;gap:4px}
+.cp input[type=color]{width:34px;height:22px;padding:0;border:1px solid #bbb;background:none}
+.cp input[type=text]{width:6.5em;font-family:monospace;font-size:12px;padding:2px 4px}
+.cp input.bad{border-color:#d33;background:#fff0f0}
+.status{font-size:12px;color:var(--muted);margin:4px 0}
+.mine{font-weight:bold;outline:2px solid #e8a000;outline-offset:-2px}
+
+table{border-collapse:collapse;width:auto;max-width:100%;table-layout:fixed}
+th,td{border:1px solid var(--line);padding:3px 6px;text-align:left;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+thead th{background:#eee;cursor:pointer;user-select:none;position:sticky;top:0;z-index:2}
+thead th .arrow{color:var(--accent);font-size:11px;margin-left:3px}
+thead tr.filters th{background:#fafafa;cursor:default;padding:2px 3px;top:26px}
+thead tr.filters input{width:100%;font-size:12px;padding:2px 4px;border:1px solid #ccc;border-radius:3px}
+tr.gtitle td{font-weight:bold;font-size:14px;padding:5px 6px;border-top:2px solid #555}
+tr.gtitle td .cnt{font-weight:normal;font-size:12px;color:#444;margin-left:10px}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.time{font-variant-numeric:tabular-nums;font-weight:600}
+td.center{text-align:center}
+.col-time{width:8.5em}.col-name{width:12em}.col-kana{width:12em}.col-club{width:var(--clubw,16em)}.col-card{width:7.5em}.col-note{width:9em}.col-cls{width:6em}.col-bus{width:5em}
+.empty{padding:20px;color:var(--muted);text-align:center}
+
+@media print{
+  @page{size:A4 portrait;margin:12mm 9mm}
+  body{padding:0;font-size:9.5pt}
+  thead th{font-size:8.5pt}
+  .noprint{display:none !important}
+  h1{font-size:15pt}
+  table{page-break-inside:auto;width:100%}
+  thead{display:table-header-group}
+  thead th{position:static;background:#e6e6e6 !important}
+  tr{page-break-inside:avoid}
+  tr.gtitle{page-break-after:avoid}
+  th,td{padding:2px 5px;white-space:normal;word-break:break-all}
+  thead th{white-space:nowrap}
+  .col-time{width:10%}.col-name{width:17%}.col-club{width:28%}.col-kana{width:19%}.col-card{width:11%}.col-note{width:15%}
+  table.hasbus .col-time{width:9%}table.hasbus .col-name{width:16%}table.hasbus .col-club{width:25%}table.hasbus .col-kana{width:19%}table.hasbus .col-card{width:10.5%}table.hasbus .col-note{width:13.5%}table.hasbus .col-bus{width:7%}
+  table.busmode .col-kana{width:20%}table.busmode .col-name{width:16%}table.busmode .col-cls{width:8%}table.busmode .col-time{width:8%}table.busmode .col-club{width:25%}table.busmode .col-card{width:10.5%}table.busmode .col-note{width:12.5%}
+  .mine{outline:none;font-weight:bold}
+  td,th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<h1 id="title"></h1>
+<div class="sub" id="subtitle"></div>
+
+<div class="panel noprint">
+  <div class="row">
+    <b>表示モード：</b>
+    <label><input type="radio" name="mode" value="cls" checked> クラス別</label>
+    <label><input type="radio" name="mode" value="course" id="modeCourse"> コース別</label>
+    <label><input type="radio" name="mode" value="bus" id="modeBus"> バス利用者（ふりがな順）</label>
+    <span id="modeNote" class="status"></span>
+    <span style="flex:1"></span>
+    <button class="primary" onclick="window.print()">PDF化／印刷（A4）</button>
+  </div>
+  <div class="row">
+    <label>自分の名前：<input type="text" id="myName" list="nameList" placeholder="氏名を入力・選択" style="width:14em"></label>
+    <datalist id="nameList"></datalist>
+    <button onclick="setMyName('')">クリア</button>
+    <label><input type="checkbox" id="winOn"> 自分の前後 <input type="number" id="winMin" value="10" min="0" max="180"> 分のスタート者だけ表示</label>
+  </div>
+  <div class="row">
+    <label>所属（部分一致）：<input type="text" id="clubQ" placeholder="例：OLC" style="width:12em"></label>
+    <label>全項目検索（部分一致）：<input type="text" id="allQ" placeholder="氏名・所属・カード番号など" style="width:16em"></label>
+    <button onclick="resetFilters()">フィルタ全解除</button>
+  </div>
+  <div class="row">
+    <label><input type="checkbox" id="showKana"> ふりがなを表示</label>
+    <label><input type="checkbox" id="busOnly"> バス利用者のみ</label>
+    <span>カード（<label><input type="checkbox" id="cardMy" checked> マイカード</label>　<label><input type="checkbox" id="cardRental" checked> レンタル（マイカード以外）</label>）</span>
+  </div>
+  <details style="margin-top:6px">
+    <summary>表示するクラス／コースを選ぶ</summary>
+    <div class="row" style="margin-top:4px"><button onclick="checkAllGroups(true)">すべて選択</button><button onclick="checkAllGroups(false)">すべて解除</button></div>
+    <div class="classbox" id="groupChecks"></div>
+  </details>
+  <details style="margin-top:6px">
+    <summary>色の設定（背景色・タイトル色）</summary>
+    <div class="row" style="margin-top:4px" id="defColorRow"></div>
+    <div class="colorgrid" id="colorGrid"></div>
+  </details>
+</div>
+<div class="status noprint" id="status"></div>
+
+<table id="tbl">
+  <thead>
+    <tr id="hdr"></tr>
+    <tr class="filters noprint" id="flt"></tr>
+  </thead>
+  <tbody id="body"></tbody>
+</table>
+
+<script>
+const DATA = {"title": "スタートリスト", "has": {"no": true, "cls": true, "course": true, "name": true, "time": true, "club": true, "kana": true, "card": true, "cardnote": true, "bus": true}, "rows": [{"no": "101", "cls": "M20A", "course": "3", "name": "白石 聖人", "time": "11:30", "club": "-", "kana": "しらいし まさと", "card": "7201103", "cardnote": "", "bus": "バス利用"}, {"no": "102", "cls": "M20A", "course": "3", "name": "伊藤 颯太", "time": "11:32", "club": "早大OC", "kana": "いとう そうた", "card": "7201104", "cardnote": "", "bus": "バス利用"}, {"no": "103", "cls": "M20A", "course": "3", "name": "塚越 太郎", "time": "11:34", "club": "-", "kana": "つかごし たろう", "card": "7201105", "cardnote": "", "bus": "バス利用"}, {"no": "104", "cls": "M20A", "course": "3", "name": "小池 徳敏", "time": "11:36", "club": "おきのOLC", "kana": "こいけ のりとし", "card": "7201107", "cardnote": "", "bus": "バス利用"}, {"no": "105", "cls": "M20A", "course": "3", "name": "小泉 瑞樹", "time": "11:38", "club": "-", "kana": "こいずみ みずき", "card": "7201108", "cardnote": "", "bus": "バス利用"}, {"no": "106", "cls": "M20A", "course": "3", "name": "髙橋 洋平", "time": "11:40", "club": "-", "kana": "たかはし ようへい", "card": "7201109", "cardnote": "", "bus": "バス利用"}, {"no": "107", "cls": "M20A", "course": "3", "name": "小泉 昭治", "time": "11:42", "club": "", "kana": "こいずみ しょうじ", "card": "7201110", "cardnote": "", "bus": "バス利用"}, {"no": "108", "cls": "M20A", "course": "3", "name": "高橋 健太", "time": "11:44", "club": "-", "kana": "たかはし けんた", "card": "7201111", "cardnote": "", "bus": "バス利用"}, {"no": "109", "cls": "M20A", "course": "3", "name": "森川 季樹", "time": "11:46", "club": "新潟大学", "kana": "もりかわ としき", "card": "7009751", "cardnote": "", "bus": "バス利用"}, {"no": "110", "cls": "M20A", "course": "3", "name": "平方 陽平", "time": "11:48", "club": "-", "kana": "ひらかた ようへい", "card": "7201113", "cardnote": "", "bus": "バス利用"}, {"no": "111", "cls": "M21A", "course": "1", "name": "高田 昌隆", "time": "11:30", "club": "青葉会", "kana": "たかだ まさたか", "card": "7201114", "cardnote": "", "bus": "バス利用"}, {"no": "112", "cls": "M21A", "course": "1", "name": "小泉 航", "time": "11:31", "club": "少年くらぶ", "kana": "こいずみ わたる", "card": "7201115", "cardnote": "", "bus": ""}, {"no": "113", "cls": "M21A", "course": "1", "name": "須藤 正敏", "time": "11:32", "club": "京葉OLクラブ", "kana": "すどう まさとし", "card": "7201116", "cardnote": "", "bus": "バス利用"}, {"no": "114", "cls": "M21A", "course": "1", "name": "加賀 博司", "time": "11:33", "club": "欅会", "kana": "かが ひろし", "card": "7201117", "cardnote": "", "bus": ""}, {"no": "115", "cls": "M21A", "course": "1", "name": "宮本 幸治", "time": "11:34", "club": "筑波大学/静岡OLC", "kana": "みやもと こうじ", "card": "7201118", "cardnote": "", "bus": ""}, {"no": "116", "cls": "M21A", "course": "1", "name": "山本 徳敏", "time": "11:35", "club": "京葉OLクラブ", "kana": "やまもと のりとし", "card": "7201119", "cardnote": "", "bus": "バス利用"}, {"no": "117", "cls": "M21A", "course": "1", "name": "有賀 和人", "time": "11:36", "club": "一般仙台市民", "kana": "ありが かずと", "card": "7201120", "cardnote": "", "bus": ""}, {"no": "118", "cls": "M21A", "course": "1", "name": "市橋 樹", "time": "11:37", "club": "大阪OLC", "kana": "いちはし たつき", "card": "8640516", "cardnote": "マイカード", "bus": ""}, {"no": "119", "cls": "M21A", "course": "1", "name": "甲斐 貴大", "time": "11:38", "club": "京都OLC", "kana": "かい たかひろ", "card": "7203502", "cardnote": "", "bus": "バス利用"}, {"no": "120", "cls": "M21A", "course": "1", "name": "蔵田 考志", "time": "11:39", "club": "ES関東C", "kana": "くらた たかし", "card": "7203503", "cardnote": "", "bus": ""}, {"no": "121", "cls": "M21A", "course": "1", "name": "村上 伊武季", "time": "11:40", "club": "練馬OLC/あざおOLC", "kana": "むらかみ いぶき", "card": "7203504", "cardnote": "", "bus": ""}, {"no": "122", "cls": "M21A", "course": "1", "name": "小幡 太郎", "time": "11:41", "club": "ES関東C", "kana": "おばた たろう", "card": "2076123", "cardnote": "マイカード", "bus": ""}, {"no": "123", "cls": "M21A", "course": "1", "name": "白石 祐斗", "time": "11:42", "club": "入間市OLC/杏友会", "kana": "しらいし ゆうと", "card": "7203506", "cardnote": "", "bus": "バス利用"}, {"no": "124", "cls": "M21A", "course": "1", "name": "浅沼 京太", "time": "11:43", "club": "みちの会", "kana": "あさぬま きょうた", "card": "7203507", "cardnote": "", "bus": "バス利用"}, {"no": "125", "cls": "M21A", "course": "1", "name": "祖父江 達也", "time": "11:44", "club": "ES関東C", "kana": "そぶえ たつや", "card": "7203508", "cardnote": "", "bus": ""}, {"no": "126", "cls": "M21A", "course": "1", "name": "瀬尾 旬哉", "time": "11:45", "club": "京葉OLC", "kana": "せお じゅんや", "card": "7203509", "cardnote": "", "bus": ""}, {"no": "127", "cls": "M21A", "course": "1", "name": "波根 基成", "time": "11:46", "club": "大阪OLC/OLCレオ/練馬OLC", "kana": "はね もとなり", "card": "7203510", "cardnote": "", "bus": "バス利用"}, {"no": "128", "cls": "M21A", "course": "1", "name": "大竹 旭陽", "time": "11:47", "club": "練馬OLC/皆伝", "kana": "おおたけ あさひ", "card": "7009752", "cardnote": "", "bus": "バス利用"}, {"no": "129", "cls": "M21A", "course": "1", "name": "渡辺 忠大", "time": "11:48", "club": "トータス", "kana": "わたなべ ただひろ", "card": "9102235", "cardnote": "マイカード", "bus": ""}, {"no": "130", "cls": "M21A", "course": "1", "name": "大類 悠斗", "time": "11:49", "club": "KOLA", "kana": "おおるい ゆうと", "card": "7203513", "cardnote": "", "bus": "バス利用"}, {"no": "131", "cls": "M21A", "course": "1", "name": "齋藤 勘次", "time": "11:50", "club": "青葉会", "kana": "さいとう かんじ", "card": "7203514", "cardnote": "", "bus": "バス利用"}, {"no": "132", "cls": "M21A", "course": "1", "name": "浦瀬 愉孝", "time": "11:51", "club": "筑波大学", "kana": "うらせ ゆたか", "card": "7000041", "cardnote": "", "bus": ""}, {"no": "133", "cls": "M21A", "course": "1", "name": "根本 健司", "time": "11:52", "club": "京葉OLクラブ/桐嶺会", "kana": "ねもと けんじ", "card": "7203516", "cardnote": "", "bus": ""}, {"no": "134", "cls": "M21A", "course": "1", "name": "久保木 征矢", "time": "11:53", "club": "朱雀OK", "kana": "くぼき せいや", "card": "7203517", "cardnote": "", "bus": ""}, {"no": "135", "cls": "M21A", "course": "1", "name": "粂 俊輔", "time": "11:54", "club": "トータス", "kana": "くめ しゅんすけ", "card": "7203518", "cardnote": "", "bus": ""}, {"no": "136", "cls": "M21A", "course": "1", "name": "渡辺 隆徳", "time": "11:55", "club": "-", "kana": "わたなべ たかのり", "card": "7203519", "cardnote": "", "bus": ""}, {"no": "137", "cls": "M21A", "course": "1", "name": "中原 佳治", "time": "11:56", "club": "GROK", "kana": "なかはら よしはる", "card": "7203520", "cardnote": "", "bus": ""}, {"no": "138", "cls": "M21A", "course": "1", "name": "白川 哲朗", "time": "11:57", "club": "-", "kana": "しらかわ てつろう", "card": "7203521", "cardnote": "", "bus": ""}, {"no": "139", "cls": "M21A", "course": "1", "name": "梶本 寛太", "time": "11:58", "club": "入間市OLC", "kana": "かじもと かんた", "card": "7203522", "cardnote": "", "bus": ""}, {"no": "140", "cls": "M21A", "course": "1", "name": "阿部 恭一郎", "time": "11:59", "club": "練馬OLC", "kana": "あべ きょういちろう", "card": "8159923", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "141", "cls": "M21A", "course": "1", "name": "村井 真也", "time": "12:00", "club": "入間市OLC", "kana": "むらい しんや", "card": "7203524", "cardnote": "", "bus": ""}, {"no": "142", "cls": "M21A", "course": "1", "name": "二木 創", "time": "12:01", "club": "静岡OLC", "kana": "にき はじめ", "card": "7007082", "cardnote": "マイカード", "bus": ""}, {"no": "143", "cls": "M21A", "course": "1", "name": "須田 晴彦", "time": "12:02", "club": "甥大好きbot", "kana": "すだ はるひこ", "card": "7203526", "cardnote": "", "bus": "バス利用"}, {"no": "144", "cls": "M21A", "course": "1", "name": "宮本 和允", "time": "12:03", "club": "新潟大学", "kana": "みやもと かずのぶ", "card": "7203527", "cardnote": "", "bus": ""}, {"no": "145", "cls": "M21A", "course": "1", "name": "柳澤 英希", "time": "12:04", "club": "-", "kana": "やなぎさわ ひでき", "card": "7203528", "cardnote": "", "bus": "バス利用"}, {"no": "146", "cls": "M21A", "course": "1", "name": "土井 一彦", "time": "12:05", "club": "ケルッチャ青葉", "kana": "どい かずひこ", "card": "7203529", "cardnote": "", "bus": ""}, {"no": "147", "cls": "M21A", "course": "1", "name": "中島 正己", "time": "12:06", "club": "入間市OLC", "kana": "なかじま まさみ", "card": "7201032", "cardnote": "", "bus": ""}, {"no": "148", "cls": "M21A", "course": "1", "name": "奥田 邦彦", "time": "12:07", "club": "丘の上/上尾OLC", "kana": "おくだ くにひこ", "card": "8008097", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "149", "cls": "M21A", "course": "1", "name": "永元 錬一郎", "time": "12:08", "club": "京葉OLクラブ/桐嶺会", "kana": "ながもと れんいちろう", "card": "7203532", "cardnote": "", "bus": ""}, {"no": "150", "cls": "M21A", "course": "1", "name": "野々山 裕亮", "time": "12:09", "club": "静岡OLC", "kana": "ののやま ゆうすけ", "card": "2045576", "cardnote": "マイカード", "bus": ""}, {"no": "151", "cls": "M21A", "course": "1", "name": "富田 真彦", "time": "12:10", "club": "ES関東C", "kana": "とみた まさひこ", "card": "7203534", "cardnote": "", "bus": "バス利用"}, {"no": "152", "cls": "M21A", "course": "1", "name": "稲葉 知晃", "time": "12:11", "club": "浜松OLC", "kana": "いなば ともあき", "card": "7203535", "cardnote": "", "bus": ""}, {"no": "153", "cls": "M21A", "course": "1", "name": "荻田 克行", "time": "12:12", "club": "ES関東C/かぼちゃ", "kana": "おぎた かつゆき", "card": "7203536", "cardnote": "", "bus": "バス利用"}, {"no": "154", "cls": "M21A", "course": "1", "name": "宇野 直央", "time": "12:13", "club": "青葉会", "kana": "うの なお", "card": "7203537", "cardnote": "", "bus": "バス利用"}, {"no": "155", "cls": "M21A", "course": "1", "name": "中村 育徳", "time": "12:14", "club": "北の国から", "kana": "なかむら やすのり", "card": "7203538", "cardnote": "", "bus": ""}, {"no": "156", "cls": "M21A", "course": "1", "name": "菅谷 貴", "time": "12:15", "club": "-", "kana": "すがや たかし", "card": "7201106", "cardnote": "", "bus": ""}, {"no": "157", "cls": "M21A", "course": "1", "name": "角岡 信親", "time": "12:16", "club": "静岡OLC", "kana": "かどおか のぶちか", "card": "8008092", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "158", "cls": "M21A", "course": "1", "name": "柴﨑 知也", "time": "12:17", "club": "-", "kana": "しばさき ともや", "card": "7137137", "cardnote": "マイカード", "bus": ""}, {"no": "159", "cls": "M21A", "course": "1", "name": "宮嶋 健二", "time": "12:18", "club": "入間市OLC", "kana": "みやじま けんじ", "card": "7203542", "cardnote": "", "bus": ""}, {"no": "160", "cls": "M21A", "course": "1", "name": "宮本 弘季", "time": "12:19", "club": "北の国から", "kana": "みやもと ひろき", "card": "7203543", "cardnote": "", "bus": ""}, {"no": "161", "cls": "M21A", "course": "1", "name": "笠井 清", "time": "12:20", "club": "東大OLK", "kana": "かさい きよし", "card": "7009757", "cardnote": "", "bus": "バス利用"}, {"no": "162", "cls": "M21A", "course": "1", "name": "谷口 一輝", "time": "12:21", "club": "京葉OLクラブ", "kana": "たにぐち かずき", "card": "7203545", "cardnote": "", "bus": "バス利用"}, {"no": "163", "cls": "M21A", "course": "1", "name": "菅原 聖人", "time": "12:22", "club": "松塾", "kana": "すがわら まさと", "card": "1396496", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "164", "cls": "M21A", "course": "1", "name": "齋藤 信一", "time": "12:23", "club": "北の国から", "kana": "さいとう しんいち", "card": "7203547", "cardnote": "", "bus": ""}, {"no": "165", "cls": "M21A", "course": "1", "name": "森川 泰樹", "time": "12:24", "club": "朱雀OK", "kana": "もりかわ たいき", "card": "7203548", "cardnote": "", "bus": "バス利用"}, {"no": "166", "cls": "M21A", "course": "1", "name": "関野 徹彦", "time": "12:25", "club": "OLCルーパー", "kana": "せきの てつひこ", "card": "7203549", "cardnote": "", "bus": ""}, {"no": "167", "cls": "M21A", "course": "1", "name": "北原 邦久", "time": "12:26", "club": "所沢OLC", "kana": "きたはら くにひさ", "card": "438952", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "168", "cls": "M21A", "course": "1", "name": "平野 凌生", "time": "12:27", "club": "長岡OLC", "kana": "ひらの りょうせい", "card": "2122601", "cardnote": "マイカード", "bus": ""}, {"no": "169", "cls": "M21A", "course": "1", "name": "太田 達也", "time": "12:28", "club": "渋谷で走る会", "kana": "おおた たつや", "card": "7203552", "cardnote": "", "bus": ""}, {"no": "170", "cls": "M21A", "course": "1", "name": "番場 洋", "time": "12:29", "club": "新潟大学", "kana": "ばんば ひろし", "card": "7203553", "cardnote": "", "bus": "バス利用"}, {"no": "171", "cls": "M21A", "course": "1", "name": "緒方 惠祐", "time": "12:30", "club": "-", "kana": "おがた けいすけ", "card": "7203554", "cardnote": "", "bus": "バス利用"}, {"no": "172", "cls": "M21A", "course": "1", "name": "石井 有祐", "time": "12:31", "club": "おしゃがみ党", "kana": "いしい ゆうすけ", "card": "7203555", "cardnote": "", "bus": ""}, {"no": "173", "cls": "M21A", "course": "1", "name": "寺町 知貴", "time": "12:32", "club": "東大OLK", "kana": "てらまち ともき", "card": "7203556", "cardnote": "", "bus": "バス利用"}, {"no": "174", "cls": "M21A", "course": "1", "name": "奥村 輔", "time": "12:33", "club": "筑波大学/OLCルーパー", "kana": "おくむら たすく", "card": "7203557", "cardnote": "", "bus": ""}, {"no": "175", "cls": "M21A", "course": "1", "name": "早野 八州馬", "time": "12:34", "club": "早大OC", "kana": "はやの やすま", "card": "8003954", "cardnote": "マイカード", "bus": ""}, {"no": "176", "cls": "M21A", "course": "1", "name": "猪俣 実", "time": "12:35", "club": "-", "kana": "いのまた みのる", "card": "7203559", "cardnote": "", "bus": ""}, {"no": "177", "cls": "M21A", "course": "1", "name": "大橋 稜真", "time": "12:36", "club": "すずかけOLC", "kana": "おおはし りょうま", "card": "7203560", "cardnote": "", "bus": ""}, {"no": "178", "cls": "M21A", "course": "1", "name": "瀬川 達也", "time": "12:37", "club": "-", "kana": "せがわ たつや", "card": "8011606", "cardnote": "マイカード", "bus": ""}, {"no": "179", "cls": "M21A", "course": "1", "name": "今泉 豊", "time": "12:38", "club": "神奈川県川崎市", "kana": "いまいずみ ゆたか", "card": "7203562", "cardnote": "", "bus": "バス利用"}, {"no": "180", "cls": "M21A", "course": "1", "name": "寺垣内 直矢", "time": "12:39", "club": "入間市OLC", "kana": "てらがいと なおや", "card": "302710", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "181", "cls": "M21A", "course": "1", "name": "桜井 恒大", "time": "12:40", "club": "青葉会", "kana": "さくらい こうだい", "card": "7203564", "cardnote": "", "bus": ""}, {"no": "182", "cls": "M21A", "course": "1", "name": "二俣 英之", "time": "12:41", "club": "", "kana": "ふたまた ひでゆき", "card": "7203565", "cardnote": "", "bus": ""}, {"no": "183", "cls": "M21A", "course": "1", "name": "後閑 光正", "time": "12:42", "club": "東大OLK", "kana": "ごかん みつまさ", "card": "7203566", "cardnote": "", "bus": "バス利用"}, {"no": "184", "cls": "M21A", "course": "1", "name": "山口 吉郎", "time": "12:43", "club": "桐嶺会", "kana": "やまぐち きちろう", "card": "7991222", "cardnote": "マイカード", "bus": ""}, {"no": "185", "cls": "M21A", "course": "1", "name": "森 晨太郎", "time": "12:44", "club": "-", "kana": "もり しんたろう", "card": "7203568", "cardnote": "", "bus": ""}, {"no": "186", "cls": "M21A", "course": "1", "name": "井上 孝祐", "time": "12:45", "club": "おねぎ", "kana": "いのうえ こうすけ", "card": "7203569", "cardnote": "", "bus": ""}, {"no": "187", "cls": "M21A", "course": "1", "name": "伊東 出", "time": "12:46", "club": "ときわ走林会", "kana": "いとう いずる", "card": "7203570", "cardnote": "", "bus": "バス利用"}, {"no": "188", "cls": "M21A", "course": "1", "name": "山口 旺", "time": "12:47", "club": "みちの会", "kana": "やまぐち おう", "card": "7203571", "cardnote": "", "bus": "バス利用"}, {"no": "189", "cls": "M21A", "course": "1", "name": "小川 琢", "time": "12:48", "club": "ES関東C", "kana": "おがわ たく", "card": "7203572", "cardnote": "", "bus": "バス利用"}, {"no": "190", "cls": "M21A", "course": "1", "name": "宮川 俊彦", "time": "12:49", "club": "青葉会", "kana": "みやがわ としひこ", "card": "7203573", "cardnote": "", "bus": ""}, {"no": "191", "cls": "M21A", "course": "1", "name": "花澤 理也", "time": "12:50", "club": "つばめ会", "kana": "はなざわ りや", "card": "7203574", "cardnote": "", "bus": "バス利用"}, {"no": "192", "cls": "M21A", "course": "1", "name": "須藤 貴之", "time": "12:51", "club": "-", "kana": "すどう たかゆき", "card": "7203575", "cardnote": "", "bus": ""}, {"no": "193", "cls": "M21A", "course": "1", "name": "吉村 宣之", "time": "12:52", "club": "杏友会", "kana": "よしむら のぶゆき", "card": "7203576", "cardnote": "", "bus": ""}, {"no": "194", "cls": "M21A", "course": "1", "name": "村越 竜生", "time": "12:53", "club": "東大OLK", "kana": "むらこし たつき", "card": "7203577", "cardnote": "", "bus": ""}, {"no": "195", "cls": "M21A", "course": "1", "name": "池 滉平", "time": "12:54", "club": "練馬OLC", "kana": "いけ こうへい", "card": "8024721", "cardnote": "マイカード", "bus": ""}, {"no": "196", "cls": "M21A", "course": "1", "name": "藤岡 昭次", "time": "12:55", "club": "ES関東C", "kana": "ふじおか しょうじ", "card": "7203579", "cardnote": "", "bus": "バス利用"}, {"no": "197", "cls": "M21A", "course": "1", "name": "福田 脩人", "time": "12:56", "club": "筑波大学", "kana": "ふくだ しゅうと", "card": "7203580", "cardnote": "", "bus": ""}, {"no": "198", "cls": "M21A", "course": "1", "name": "水嶋 大河", "time": "12:57", "club": "静岡OLC/GROK", "kana": "みずしま たいが", "card": "7203581", "cardnote": "", "bus": "バス利用"}, {"no": "199", "cls": "M21A", "course": "1", "name": "森 陽樹", "time": "12:58", "club": "入間市OLC", "kana": "もり はるき", "card": "7203582", "cardnote": "", "bus": ""}, {"no": "200", "cls": "M21A", "course": "1", "name": "橋本 則仁", "time": "12:59", "club": "一般仙台市民", "kana": "はしもと のりひと", "card": "7203583", "cardnote": "", "bus": "バス利用"}, {"no": "201", "cls": "M21A", "course": "1", "name": "近藤 克利", "time": "13:00", "club": "入間市OLC", "kana": "こんどう かつとし", "card": "7203584", "cardnote": "", "bus": ""}, {"no": "202", "cls": "M21A", "course": "1", "name": "小山 辰喜", "time": "13:01", "club": "横浜OLクラブ/GROK", "kana": "こやま たつき", "card": "7203585", "cardnote": "", "bus": ""}, {"no": "203", "cls": "M21A", "course": "1", "name": "伊藤 健一", "time": "13:02", "club": "東大OLK/ファはファシュタのファ", "kana": "いとう けんいち", "card": "7203586", "cardnote": "", "bus": "バス利用"}, {"no": "204", "cls": "M21A", "course": "1", "name": "田中 健介", "time": "13:03", "club": "丘の上", "kana": "たなか けんすけ", "card": "7203587", "cardnote": "", "bus": ""}, {"no": "205", "cls": "M21A", "course": "1", "name": "七房 勇紀", "time": "13:04", "club": "入間市OLC", "kana": "ななふさ ゆうき", "card": "7203588", "cardnote": "", "bus": ""}, {"no": "206", "cls": "M21A", "course": "1", "name": "浦瀬 雅秀", "time": "13:05", "club": "東大OLK", "kana": "うらせ まさひで", "card": "7203589", "cardnote": "", "bus": ""}, {"no": "207", "cls": "M21A", "course": "1", "name": "茅野 博好", "time": "13:06", "club": "京葉オリエンテーリングクラブ", "kana": "かやの ひろよし", "card": "7203590", "cardnote": "", "bus": "バス利用"}, {"no": "208", "cls": "M21A", "course": "1", "name": "大橋 達哉", "time": "13:07", "club": "ES関東C", "kana": "おおはし たつや", "card": "7203591", "cardnote": "", "bus": "バス利用"}, {"no": "209", "cls": "M21A", "course": "1", "name": "古田島 健史", "time": "13:08", "club": "横浜OLクラブ/つばめ会", "kana": "こたじま たけし", "card": "7203592", "cardnote": "", "bus": ""}, {"no": "210", "cls": "M21A", "course": "1", "name": "松本 貴文", "time": "13:09", "club": "鳩の会", "kana": "まつもと たかふみ", "card": "7203593", "cardnote": "", "bus": "バス利用"}, {"no": "211", "cls": "M21A", "course": "1", "name": "鷲田 虹汰", "time": "13:10", "club": "ES関東C", "kana": "わしだ こうた", "card": "8011567", "cardnote": "マイカード", "bus": ""}, {"no": "212", "cls": "M21A", "course": "1", "name": "大六野 厚", "time": "13:11", "club": "すずかけOLC/つばめ会", "kana": "だいろくの あつし", "card": "7203595", "cardnote": "", "bus": "バス利用"}, {"no": "214", "cls": "M21A", "course": "1", "name": "内藤 亮太", "time": "13:13", "club": "-", "kana": "ないとう りょうた", "card": "7203597", "cardnote": "", "bus": ""}, {"no": "215", "cls": "M21A", "course": "1", "name": "長瀬 祐貴", "time": "13:14", "club": "GROK", "kana": "ながせ ゆうき", "card": "7203598", "cardnote": "", "bus": ""}, {"no": "216", "cls": "M21A", "course": "1", "name": "佐藤 健志", "time": "13:15", "club": "東大OLK", "kana": "さとう けんじ", "card": "7203599", "cardnote": "", "bus": ""}, {"no": "217", "cls": "M21A", "course": "1", "name": "松澤 湧", "time": "13:16", "club": "トータス/入間市OLC", "kana": "まつざわ ゆう", "card": "7203600", "cardnote": "", "bus": ""}, {"no": "218", "cls": "M21A", "course": "1", "name": "本多 良太", "time": "13:17", "club": "京葉OLクラブ", "kana": "ほんだ りょうた", "card": "8003275", "cardnote": "マイカード", "bus": ""}, {"no": "219", "cls": "M21A", "course": "1", "name": "石原 仁", "time": "13:18", "club": "OLCルーパー/GROK", "kana": "いしはら ひとし", "card": "7203602", "cardnote": "", "bus": ""}, {"no": "220", "cls": "M21A", "course": "1", "name": "藤生 洋平", "time": "13:19", "club": "東大OLK", "kana": "ふじう ようへい", "card": "7203603", "cardnote": "", "bus": ""}, {"no": "221", "cls": "M21A", "course": "1", "name": "神戸 校市", "time": "13:20", "club": "入間市OLC", "kana": "かんべ こういち", "card": "7203604", "cardnote": "", "bus": ""}, {"no": "222", "cls": "M21A", "course": "1", "name": "和田 清", "time": "13:21", "club": "ときわ走林会", "kana": "わだ きよし", "card": "7208013", "cardnote": "マイカード", "bus": ""}, {"no": "223", "cls": "M21A", "course": "1", "name": "佐野 雅弥", "time": "13:22", "club": "早大OC/練馬OLC", "kana": "さの まさや", "card": "8664055", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "224", "cls": "M21A", "course": "1", "name": "田垣 裕志", "time": "13:23", "club": "練馬OLC", "kana": "たがき ひろし", "card": "9201800", "cardnote": "マイカード", "bus": ""}, {"no": "225", "cls": "M21A", "course": "1", "name": "大石 勇", "time": "13:24", "club": "東大OLK/トータス", "kana": "おおいし いさむ", "card": "7203608", "cardnote": "", "bus": "バス利用"}, {"no": "226", "cls": "M21A", "course": "1", "name": "杉本 正己", "time": "13:25", "club": "筑波大学", "kana": "すぎもと まさみ", "card": "7203609", "cardnote": "", "bus": "バス利用"}, {"no": "227", "cls": "M21A", "course": "1", "name": "古田島 紀夫", "time": "13:26", "club": "つばめ会", "kana": "こたじま のりお", "card": "7203610", "cardnote": "", "bus": "バス利用"}, {"no": "228", "cls": "M21A", "course": "1", "name": "稲毛 匠", "time": "13:27", "club": "京葉OLクラブ", "kana": "いなげ たくみ", "card": "8015904", "cardnote": "マイカード", "bus": ""}, {"no": "229", "cls": "M21AS", "course": "2", "name": "橘 遼平", "time": "11:31", "club": "入間市OLC", "kana": "たちばな りょうへい", "card": "7203612", "cardnote": "", "bus": "バス利用"}, {"no": "230", "cls": "M21AS", "course": "2", "name": "杉本 竣介", "time": "11:33", "club": "静岡OLC", "kana": "すぎもと しゅんすけ", "card": "7203613", "cardnote": "", "bus": ""}, {"no": "231", "cls": "M21AS", "course": "2", "name": "福田 耕平", "time": "11:35", "club": "自親会", "kana": "ふくだ こうへい", "card": "7203614", "cardnote": "", "bus": ""}, {"no": "232", "cls": "M21AS", "course": "2", "name": "末満 航", "time": "11:37", "club": "千葉県協会", "kana": "すえみつ わたる", "card": "7203615", "cardnote": "", "bus": ""}, {"no": "233", "cls": "M21AS", "course": "2", "name": "渡辺 良", "time": "11:39", "club": "丘の上", "kana": "わたなべ りょう", "card": "7203616", "cardnote": "", "bus": ""}, {"no": "234", "cls": "M21AS", "course": "2", "name": "大木 雄輔", "time": "11:41", "club": "東京OLクラブ", "kana": "おおき ゆうすけ", "card": "7205575", "cardnote": "マイカード", "bus": ""}, {"no": "235", "cls": "M21AS", "course": "2", "name": "松尾 巧", "time": "11:43", "club": "-", "kana": "まつお たくみ", "card": "7203618", "cardnote": "", "bus": "バス利用"}, {"no": "236", "cls": "M21AS", "course": "2", "name": "森河 舜", "time": "11:45", "club": "緑桜会(緑外会)", "kana": "もりかわ しゅん", "card": "7203619", "cardnote": "", "bus": "バス利用"}, {"no": "237", "cls": "M35A", "course": "4", "name": "清水 和希", "time": "11:25", "club": "群馬県太田市", "kana": "しみず かずき", "card": "8664052", "cardnote": "マイカード", "bus": ""}, {"no": "238", "cls": "M35A", "course": "4", "name": "山本 悠太", "time": "11:54", "club": "-", "kana": "やまもと ゆうた", "card": "7203971", "cardnote": "", "bus": ""}, {"no": "239", "cls": "M35A", "course": "4", "name": "加藤 佑樹", "time": "11:56", "club": "京葉OLクラブ", "kana": "かとう ゆうき", "card": "7203973", "cardnote": "", "bus": ""}, {"no": "240", "cls": "M35A", "course": "4", "name": "金子 俊成", "time": "11:58", "club": "-", "kana": "かねこ としなり", "card": "7203974", "cardnote": "", "bus": ""}, {"no": "241", "cls": "M35A", "course": "4", "name": "酒井 修", "time": "12:00", "club": "入間市OLC", "kana": "さかい おさむ", "card": "7203975", "cardnote": "", "bus": ""}, {"no": "242", "cls": "M35A", "course": "4", "name": "下村 剛美", "time": "12:02", "club": "京葉OLクラブ", "kana": "しもむら たけみ", "card": "7203976", "cardnote": "", "bus": "バス利用"}, {"no": "243", "cls": "M35A", "course": "4", "name": "鹿野 庸雅", "time": "12:04", "club": "ES関東C", "kana": "かの つねまさ", "card": "2078585", "cardnote": "マイカード", "bus": ""}, {"no": "244", "cls": "M35A", "course": "4", "name": "太矢 義文", "time": "12:06", "club": "奈良市", "kana": "たや よしふみ", "card": "7203978", "cardnote": "", "bus": "バス利用"}, {"no": "245", "cls": "M35A", "course": "4", "name": "谷口 拓", "time": "12:08", "club": "丘の上", "kana": "たにぐち たく", "card": "7203979", "cardnote": "", "bus": "バス利用"}, {"no": "246", "cls": "M35A", "course": "4", "name": "溝端 浩二", "time": "12:10", "club": "Club 阿闍梨", "kana": "みぞばた こうじ", "card": "7203980", "cardnote": "", "bus": ""}, {"no": "247", "cls": "M35A", "course": "4", "name": "秋山 遥介", "time": "12:12", "club": "入間市OLC", "kana": "あきやま ようすけ", "card": "7209253", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "248", "cls": "M35A", "course": "4", "name": "井上 洸", "time": "12:14", "club": "横浜OLクラブ", "kana": "いのうえ こう", "card": "7203982", "cardnote": "", "bus": ""}, {"no": "249", "cls": "M35A", "course": "4", "name": "三好 達也", "time": "12:16", "club": "ワンダラーズ", "kana": "みよし たつや", "card": "7300004", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "250", "cls": "M35A", "course": "4", "name": "弓田 峻汰", "time": "12:18", "club": "川越OLC", "kana": "ゆみた しゅんた", "card": "7208338", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "251", "cls": "M35A", "course": "4", "name": "山岸 義伸", "time": "12:20", "club": "京葉OLクラブ", "kana": "やまぎし よしのぶ", "card": "7203985", "cardnote": "", "bus": ""}, {"no": "252", "cls": "M35A", "course": "4", "name": "武田 智哉", "time": "12:22", "club": "大阪OLC", "kana": "たけだ ともや", "card": "212273", "cardnote": "マイカード", "bus": ""}, {"no": "253", "cls": "M50A", "course": "5", "name": "加藤 遼太", "time": "11:49", "club": "三河OLC", "kana": "かとう りょうた", "card": "7203987", "cardnote": "", "bus": ""}, {"no": "254", "cls": "M50A", "course": "5", "name": "中西 栄", "time": "11:51", "club": "ES関東クラブ", "kana": "なかにし さかえ", "card": "7203988", "cardnote": "", "bus": ""}, {"no": "255", "cls": "M50A", "course": "5", "name": "竹下 大地", "time": "11:53", "club": "丘の上", "kana": "たけした だいち", "card": "7203989", "cardnote": "", "bus": ""}, {"no": "256", "cls": "M50A", "course": "5", "name": "君島 匠", "time": "11:55", "club": "つるまいOLC", "kana": "きみじま たくみ", "card": "1525202", "cardnote": "マイカード", "bus": ""}, {"no": "257", "cls": "M50A", "course": "5", "name": "古田島 洋一", "time": "11:57", "club": "Club阿闍梨", "kana": "こたじま よういち", "card": "7203991", "cardnote": "", "bus": ""}, {"no": "258", "cls": "M50A", "course": "5", "name": "田辺 茂夫", "time": "11:59", "club": "電気技術開発OL愛好会", "kana": "たなべ しげお", "card": "7203992", "cardnote": "", "bus": "バス利用"}, {"no": "259", "cls": "M50A", "course": "5", "name": "岩城 耕治", "time": "12:01", "club": "多摩OL", "kana": "いわき こうじ", "card": "7713041", "cardnote": "マイカード", "bus": ""}, {"no": "260", "cls": "M50A", "course": "5", "name": "加藤 健仁", "time": "12:03", "club": "三河OLC", "kana": "かとう けんと", "card": "1602583", "cardnote": "マイカード", "bus": ""}, {"no": "261", "cls": "M50A", "course": "5", "name": "佐藤 茂弘", "time": "12:05", "club": "京葉OLクラブ", "kana": "さとう しげひろ", "card": "7203996", "cardnote": "", "bus": ""}, {"no": "262", "cls": "M50A", "course": "5", "name": "名雪 成行", "time": "12:07", "club": "京葉OLC", "kana": "なゆき なりゆき", "card": "2078586", "cardnote": "マイカード", "bus": ""}, {"no": "263", "cls": "M50A", "course": "5", "name": "戸谷 和", "time": "12:09", "club": "丘の上", "kana": "とや かず", "card": "7203997", "cardnote": "", "bus": ""}, {"no": "264", "cls": "M50A", "course": "5", "name": "町井 一郎", "time": "12:11", "club": "Club阿闍梨", "kana": "まちい いちろう", "card": "7203998", "cardnote": "", "bus": ""}, {"no": "265", "cls": "M50A", "course": "5", "name": "井口 研", "time": "12:13", "club": "ゾウガメOLK", "kana": "いぐち けん", "card": "7203999", "cardnote": "", "bus": ""}, {"no": "266", "cls": "M50A", "course": "5", "name": "笠原 喜代志", "time": "12:15", "club": "-", "kana": "かさはら きよし", "card": "7204000", "cardnote": "", "bus": ""}, {"no": "267", "cls": "M50A", "course": "5", "name": "酒井 英雄", "time": "12:17", "club": "OLCふるはうす/OLCルーパー", "kana": "さかい ひでお", "card": "7205573", "cardnote": "", "bus": "バス利用"}, {"no": "268", "cls": "M50A", "course": "5", "name": "結城 昌信", "time": "12:19", "club": "OLCレオ", "kana": "ゆうき まさのぶ", "card": "1959115", "cardnote": "マイカード", "bus": ""}, {"no": "269", "cls": "M50A", "course": "5", "name": "池田 太郎", "time": "12:21", "club": "ソニーOLC", "kana": "いけだ たろう", "card": "9102207", "cardnote": "マイカード", "bus": ""}, {"no": "270", "cls": "M50A", "course": "5", "name": "鈴木 孝", "time": "12:23", "club": "-", "kana": "すずき たかし", "card": "7205581", "cardnote": "", "bus": ""}, {"no": "271", "cls": "M50A", "course": "5", "name": "北見 明", "time": "12:25", "club": "静岡OLC", "kana": "きたみ あきら", "card": "7205583", "cardnote": "", "bus": "バス利用"}, {"no": "272", "cls": "M50A", "course": "5", "name": "新 穣", "time": "12:27", "club": "ES関東C", "kana": "あたらし みのる", "card": "7205584", "cardnote": "", "bus": ""}, {"no": "273", "cls": "M50A", "course": "5", "name": "森下 宏樹", "time": "12:29", "club": "OLCふるはうす", "kana": "もりした ひろき", "card": "8000913", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "274", "cls": "M50A", "course": "5", "name": "西下 卓", "time": "12:31", "club": "札幌OLC", "kana": "にしした たく", "card": "7205590", "cardnote": "", "bus": ""}, {"no": "275", "cls": "M50A", "course": "5", "name": "加賀谷 稔", "time": "12:33", "club": "東京OLクラブ", "kana": "かがや みのる", "card": "7205586", "cardnote": "マイカード", "bus": ""}, {"no": "276", "cls": "M50A", "course": "5", "name": "楠 怜治", "time": "12:35", "club": "杏友会", "kana": "くすのき れいじ", "card": "7209502", "cardnote": "", "bus": "バス利用"}, {"no": "277", "cls": "M50A", "course": "5", "name": "大塚 洋一", "time": "12:37", "club": "横浜OLクラブ", "kana": "おおつか よういち", "card": "7205585", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "278", "cls": "M50A", "course": "5", "name": "川名 航太朗", "time": "12:39", "club": "桐嶺会", "kana": "かわな こうたろう", "card": "7209504", "cardnote": "", "bus": "バス利用"}, {"no": "279", "cls": "M50A", "course": "5", "name": "木村 竣介", "time": "12:41", "club": "長野県協会", "kana": "きむら しゅんすけ", "card": "7205580", "cardnote": "マイカード", "bus": ""}, {"no": "280", "cls": "M50A", "course": "5", "name": "山本 真一", "time": "12:43", "club": "SOLC", "kana": "やまもと しんいち", "card": "7209506", "cardnote": "", "bus": ""}, {"no": "281", "cls": "M50A", "course": "5", "name": "鈴木 淳", "time": "12:45", "club": "多摩OL", "kana": "すずき じゅん", "card": "7209507", "cardnote": "", "bus": "バス利用"}, {"no": "282", "cls": "M50A", "course": "5", "name": "尾花 晃一", "time": "12:47", "club": "練馬OLC", "kana": "おばな こういち", "card": "8029555", "cardnote": "マイカード", "bus": ""}, {"no": "283", "cls": "M50A", "course": "5", "name": "古谷 賢二", "time": "12:49", "club": "入間市OLC", "kana": "ふるや けんじ", "card": "7209509", "cardnote": "", "bus": "バス利用"}, {"no": "284", "cls": "M50A", "course": "5", "name": "樋口 英", "time": "12:51", "club": "川越OLC", "kana": "ひぐち すぐる", "card": "7203649", "cardnote": "マイカード", "bus": ""}, {"no": "285", "cls": "M50A", "course": "5", "name": "原野 和生", "time": "12:53", "club": "Club阿闍梨", "kana": "はらの かずお", "card": "8195323", "cardnote": "マイカード", "bus": ""}, {"no": "286", "cls": "M50A", "course": "5", "name": "山田 嵩真", "time": "12:55", "club": "OLP兵庫", "kana": "やまだ しゅうま", "card": "7200437", "cardnote": "マイカード", "bus": ""}, {"no": "287", "cls": "M50A", "course": "5", "name": "倉上 颯太", "time": "12:57", "club": "京葉OLクラブ", "kana": "くらかみ そうた", "card": "7209513", "cardnote": "", "bus": "バス利用"}, {"no": "288", "cls": "M50A", "course": "5", "name": "荒井 和男", "time": "12:59", "club": "OLCルーパー", "kana": "あらい かずお", "card": "8400929", "cardnote": "マイカード", "bus": ""}, {"no": "289", "cls": "M50A", "course": "5", "name": "森 由太", "time": "13:01", "club": "上尾OLC", "kana": "もり ゆうた", "card": "7209515", "cardnote": "", "bus": ""}, {"no": "290", "cls": "M50A", "course": "5", "name": "鈴木 周平", "time": "13:03", "club": "ゾウガメOLK", "kana": "すずき しゅうへい", "card": "7209516", "cardnote": "", "bus": ""}, {"no": "291", "cls": "M50A", "course": "5", "name": "山岸 克哉", "time": "13:05", "club": "横浜OLクラブ", "kana": "やまぎし かつや", "card": "2033827", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "292", "cls": "M50A", "course": "5", "name": "白井 駿", "time": "13:07", "club": "ES関東C", "kana": "しらい しゅん", "card": "7209518", "cardnote": "", "bus": ""}, {"no": "293", "cls": "M50A", "course": "5", "name": "冨山 晃弘", "time": "13:09", "club": "ちーむとりけも", "kana": "とみやま あきひろ", "card": "7209519", "cardnote": "", "bus": "バス利用"}, {"no": "294", "cls": "M50A", "course": "5", "name": "乗冨 潤哉", "time": "13:11", "club": "大阪OLC", "kana": "のりとみ じゅんや", "card": "1583301", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "295", "cls": "M50A", "course": "5", "name": "鷲津 秀和", "time": "13:13", "club": "ES関東クラブ", "kana": "わしづ ひでかず", "card": "7209521", "cardnote": "", "bus": ""}, {"no": "296", "cls": "M50A", "course": "5", "name": "長縄 俊之", "time": "13:15", "club": "高崎OLC", "kana": "ながなわ としゆき", "card": "8185484", "cardnote": "マイカード", "bus": ""}, {"no": "297", "cls": "M50A", "course": "5", "name": "平岩 駿", "time": "13:17", "club": "宮崎県協会", "kana": "ひらいわ しゅん", "card": "7111500", "cardnote": "マイカード", "bus": ""}, {"no": "298", "cls": "M65A", "course": "6", "name": "坂倉 光馬", "time": "12:25", "club": "-", "kana": "さかくら こうま", "card": "7209524", "cardnote": "", "bus": ""}, {"no": "299", "cls": "M65A", "course": "6", "name": "八神 規弘", "time": "12:27", "club": "ES関東クラブ", "kana": "やがみ のりひろ", "card": "7203622", "cardnote": "マイカード", "bus": ""}, {"no": "300", "cls": "M65A", "course": "6", "name": "藤井 由幸", "time": "12:29", "club": "東海市", "kana": "ふじい よしゆき", "card": "7211376", "cardnote": "マイカード", "bus": ""}, {"no": "301", "cls": "M65A", "course": "6", "name": "林 俊輝", "time": "12:31", "club": "岐阜OLC", "kana": "はやし としき", "card": "7203628", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "302", "cls": "M65A", "course": "6", "name": "泉田 隆聖", "time": "12:33", "club": "東京OLクラブ", "kana": "いずみだ たかまさ", "card": "7209528", "cardnote": "", "bus": ""}, {"no": "303", "cls": "M65A", "course": "6", "name": "山岸 暁彦", "time": "12:35", "club": "YTC78", "kana": "やまぎし あきひこ", "card": "7209529", "cardnote": "", "bus": ""}, {"no": "304", "cls": "M65A", "course": "6", "name": "石山 康", "time": "12:37", "club": "上尾OLクラブ", "kana": "いしやま やすし", "card": "7300388", "cardnote": "マイカード", "bus": ""}, {"no": "305", "cls": "M65A", "course": "6", "name": "神山 須彦", "time": "12:39", "club": "入間市OLC", "kana": "かみやま すけひこ", "card": "7209531", "cardnote": "", "bus": "バス利用"}, {"no": "306", "cls": "M65A", "course": "6", "name": "粂 剛", "time": "12:41", "club": "多摩OL", "kana": "くめ つよし", "card": "212268", "cardnote": "マイカード", "bus": ""}, {"no": "307", "cls": "M65A", "course": "6", "name": "鈴木 康次郎", "time": "12:43", "club": "Club阿闍梨", "kana": "すずき こうじろう", "card": "8310600", "cardnote": "マイカード", "bus": ""}, {"no": "308", "cls": "M65A", "course": "6", "name": "池田 信悟", "time": "12:45", "club": "OLCレオ", "kana": "いけだ しんご", "card": "1542713", "cardnote": "マイカード", "bus": ""}, {"no": "309", "cls": "M65A", "course": "6", "name": "豊田 英博", "time": "12:47", "club": "OC⊿下野", "kana": "とよだ ひでひろ", "card": "7206935", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "310", "cls": "M65A", "course": "6", "name": "藤澤 浩一", "time": "12:49", "club": "多摩OL", "kana": "ふじさわ こういち", "card": "7209536", "cardnote": "", "bus": "バス利用"}, {"no": "311", "cls": "M65A", "course": "6", "name": "山内 弘之", "time": "12:51", "club": "Team白樺", "kana": "やまうち ひろゆき", "card": "7203652", "cardnote": "マイカード", "bus": ""}, {"no": "312", "cls": "M65A", "course": "6", "name": "前川 幸男", "time": "12:53", "club": "千葉OLK", "kana": "まえかわ ゆきお", "card": "8268907", "cardnote": "マイカード", "bus": ""}, {"no": "313", "cls": "M65A", "course": "6", "name": "斎藤 誠", "time": "12:55", "club": "岐阜OLC", "kana": "さいとう まこと", "card": "2112591", "cardnote": "マイカード", "bus": ""}, {"no": "314", "cls": "M75A", "course": "7", "name": "豊澤 克明", "time": "11:42", "club": "川口OLC", "kana": "とよさわ かつあき", "card": "7203632", "cardnote": "マイカード", "bus": ""}, {"no": "315", "cls": "M75A", "course": "7", "name": "南河 翔一", "time": "11:44", "club": "ワンダラーズ", "kana": "みなみかわ しょういち", "card": "7208418", "cardnote": "マイカード", "bus": ""}, {"no": "316", "cls": "M75A", "course": "7", "name": "鵜飼 隆士", "time": "11:46", "club": "多摩OL", "kana": "うかい たかし", "card": "7009758", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "317", "cls": "M75A", "course": "7", "name": "鹿島田 萌起", "time": "11:48", "club": "所沢OLC", "kana": "かしまだ もえき", "card": "7209543", "cardnote": "", "bus": ""}, {"no": "318", "cls": "M75A", "course": "7", "name": "立山 剛", "time": "11:50", "club": "横浜OLクラブ", "kana": "たてやま つよし", "card": "7209544", "cardnote": "", "bus": ""}, {"no": "319", "cls": "M75A", "course": "7", "name": "青木 隆明", "time": "11:52", "club": "ファミリーOLC", "kana": "あおき たかあき", "card": "7209545", "cardnote": "", "bus": "バス利用"}, {"no": "320", "cls": "M75A", "course": "7", "name": "小牧 亮太", "time": "11:54", "club": "ワンダラーズ", "kana": "こまき りょうた", "card": "7207954", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "321", "cls": "M75A", "course": "7", "name": "古屋 良範", "time": "11:56", "club": "三河OLC", "kana": "ふるや よしのり", "card": "7209547", "cardnote": "", "bus": ""}, {"no": "322", "cls": "M85A", "course": "8", "name": "松橋 賢史", "time": "11:47", "club": "多摩OL", "kana": "まつはし けんじ", "card": "8201970", "cardnote": "マイカード", "bus": ""}, {"no": "323", "cls": "MB", "course": "9", "name": "大類 隼人", "time": "12:03", "club": "-", "kana": "おおるい はやと", "card": "7209549", "cardnote": "", "bus": ""}, {"no": "324", "cls": "MB", "course": "9", "name": "今松 孝久", "time": "12:05", "club": "京葉オリエンテーリングクラブ", "kana": "いままつ たかひさ", "card": "7209550", "cardnote": "", "bus": ""}, {"no": "325", "cls": "MB", "course": "9", "name": "福田 大暉", "time": "12:07", "club": "-", "kana": "ふくだ だいき", "card": "7209551", "cardnote": "", "bus": ""}, {"no": "326", "cls": "MB", "course": "9", "name": "井上 遼介", "time": "12:09", "club": "南蛮連合", "kana": "いのうえ りょうすけ", "card": "7209552", "cardnote": "", "bus": "バス利用"}, {"no": "327", "cls": "MB", "course": "9", "name": "池 伸好", "time": "12:11", "club": "-", "kana": "いけ のぶよし", "card": "7209553", "cardnote": "", "bus": "バス利用"}, {"no": "328", "cls": "MB", "course": "9", "name": "緒方 哲矢", "time": "12:13", "club": "TREKNAO", "kana": "おがた てつや", "card": "7209554", "cardnote": "", "bus": "バス利用"}, {"no": "329", "cls": "MB", "course": "9", "name": "松尾 明史", "time": "12:15", "club": "東京農工大学", "kana": "まつお あきふみ", "card": "7209555", "cardnote": "", "bus": "バス利用"}, {"no": "330", "cls": "MB", "course": "9", "name": "横堀 啓介", "time": "12:17", "club": "-", "kana": "よこぼり けいすけ", "card": "7209556", "cardnote": "", "bus": ""}, {"no": "331", "cls": "MB", "course": "9", "name": "高見澤 岳人", "time": "12:19", "club": "筑波大学", "kana": "たかみざわ たけと", "card": "7209557", "cardnote": "", "bus": ""}, {"no": "332", "cls": "W20A", "course": "5", "name": "小林 日菜子", "time": "11:30", "club": "-", "kana": "こばやし ひなこ", "card": "7201112", "cardnote": "", "bus": "バス利用"}, {"no": "333", "cls": "W20A", "course": "5", "name": "神山 知江子", "time": "11:32", "club": "入間市OLC", "kana": "かみやま ちえこ", "card": "7209559", "cardnote": "", "bus": "バス利用"}, {"no": "334", "cls": "W20A", "course": "5", "name": "西村 友絵", "time": "11:34", "club": "", "kana": "にしむら ともえ", "card": "7209560", "cardnote": "", "bus": ""}, {"no": "336", "cls": "W20A", "course": "5", "name": "早川 早苗", "time": "11:38", "club": "-", "kana": "はやかわ さなえ", "card": "7209562", "cardnote": "", "bus": "バス利用"}, {"no": "337", "cls": "W21A", "course": "3", "name": "砂原 みな子", "time": "12:30", "club": "GROK", "kana": "すなはら みなこ", "card": "7209563", "cardnote": "", "bus": ""}, {"no": "338", "cls": "W21A", "course": "3", "name": "東條 七彩", "time": "12:32", "club": "-", "kana": "とうじょう ななせ", "card": "7209564", "cardnote": "", "bus": ""}, {"no": "339", "cls": "W21A", "course": "3", "name": "太田 聖子", "time": "12:34", "club": "長岡OLC", "kana": "おおた せいこ", "card": "2122599", "cardnote": "マイカード", "bus": ""}, {"no": "340", "cls": "W21A", "course": "3", "name": "五十嵐 美奈子", "time": "12:36", "club": "ちゃちゃも", "kana": "いがらし みなこ", "card": "7209566", "cardnote": "", "bus": ""}, {"no": "341", "cls": "W21A", "course": "3", "name": "根岸 陽子", "time": "12:38", "club": "入間市OLC", "kana": "ねぎし ようこ", "card": "7209249", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "342", "cls": "W21A", "course": "3", "name": "久慈 泰代", "time": "12:40", "club": "京葉OLクラブ", "kana": "くじ やすよ", "card": "7209568", "cardnote": "", "bus": ""}, {"no": "343", "cls": "W21A", "course": "3", "name": "宮川 暢子", "time": "12:42", "club": "桐嶺会", "kana": "みやがわ のぶこ", "card": "7960722", "cardnote": "マイカード", "bus": ""}, {"no": "344", "cls": "W21A", "course": "3", "name": "種村 麻子", "time": "12:44", "club": "新潟大学", "kana": "たねむら あさこ", "card": "7209570", "cardnote": "", "bus": "バス利用"}, {"no": "345", "cls": "W21A", "course": "3", "name": "田谷 陽子", "time": "12:46", "club": "ES関東C", "kana": "たや ようこ", "card": "438953", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "346", "cls": "W21A", "course": "3", "name": "大林 夏希", "time": "12:48", "club": "-", "kana": "おおばやし なつき", "card": "7209572", "cardnote": "", "bus": "バス利用"}, {"no": "347", "cls": "W21A", "course": "3", "name": "今井 亜樹子", "time": "12:50", "club": "東大OLK", "kana": "いまい あきこ", "card": "7209573", "cardnote": "", "bus": ""}, {"no": "348", "cls": "W21A", "course": "3", "name": "木村 鈴音", "time": "12:52", "club": "静岡OLC", "kana": "きむら すずね", "card": "7209574", "cardnote": "", "bus": "バス利用"}, {"no": "349", "cls": "W21A", "course": "3", "name": "小暮 久子", "time": "12:54", "club": "青葉会", "kana": "こぐれ ひさこ", "card": "7209575", "cardnote": "", "bus": ""}, {"no": "350", "cls": "W21A", "course": "3", "name": "田中 綾", "time": "12:56", "club": "入間市OLC/鞍部同好会", "kana": "たなか あや", "card": "7209576", "cardnote": "", "bus": ""}, {"no": "351", "cls": "W21A", "course": "3", "name": "齋藤 友理奈", "time": "12:58", "club": "朱雀OK", "kana": "さいとう ゆりな", "card": "7209577", "cardnote": "", "bus": "バス利用"}, {"no": "352", "cls": "W21A", "course": "3", "name": "小島 加子", "time": "13:00", "club": "-", "kana": "こじま かこ", "card": "7209578", "cardnote": "", "bus": "バス利用"}, {"no": "353", "cls": "W21A", "course": "3", "name": "稲田 遥", "time": "13:02", "club": "ES関東C/東大OLK", "kana": "いなだ はるか", "card": "7209579", "cardnote": "", "bus": ""}, {"no": "354", "cls": "W21A", "course": "3", "name": "高村 青葉", "time": "13:04", "club": "-", "kana": "たかむら あおば", "card": "7209580", "cardnote": "", "bus": ""}, {"no": "355", "cls": "W21A", "course": "3", "name": "鷲田 真悠子", "time": "13:06", "club": "新潟大学", "kana": "わしだ まゆこ", "card": "7209581", "cardnote": "", "bus": "バス利用"}, {"no": "356", "cls": "W21A", "course": "3", "name": "高村 祐子", "time": "13:08", "club": "つくばCocco", "kana": "たかむら ゆうこ", "card": "7209582", "cardnote": "", "bus": ""}, {"no": "357", "cls": "W21A", "course": "3", "name": "小寺 まどか", "time": "13:10", "club": "-", "kana": "こでら まどか", "card": "7209583", "cardnote": "", "bus": ""}, {"no": "358", "cls": "W21A", "course": "3", "name": "渡邊 美奈", "time": "13:12", "club": "筑波大学", "kana": "わたなべ みな", "card": "7209584", "cardnote": "", "bus": ""}, {"no": "359", "cls": "W21A", "course": "3", "name": "近藤 早穂", "time": "13:14", "club": "長岡OLC", "kana": "こんどう さほ", "card": "2122600", "cardnote": "マイカード", "bus": ""}, {"no": "360", "cls": "W21A", "course": "3", "name": "児玉 茉菜", "time": "13:16", "club": "-", "kana": "こだま まな", "card": "7209586", "cardnote": "", "bus": ""}, {"no": "361", "cls": "W21A", "course": "3", "name": "古林 有紗", "time": "13:18", "club": "", "kana": "ふるばやし ありさ", "card": "7209587", "cardnote": "", "bus": ""}, {"no": "362", "cls": "W21A", "course": "3", "name": "河村 文", "time": "13:20", "club": "ES関東C", "kana": "かわむら あや", "card": "8495113", "cardnote": "マイカード", "bus": ""}, {"no": "363", "cls": "W21AS", "course": "4", "name": "山田 夏姫", "time": "11:31", "club": "-", "kana": "やまだ なつき", "card": "7209589", "cardnote": "", "bus": ""}, {"no": "364", "cls": "W21AS", "course": "4", "name": "近内 麻記", "time": "11:33", "club": "ES関東C", "kana": "こんない まき", "card": "8011578", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "365", "cls": "W21AS", "course": "4", "name": "高橋 ふみ子", "time": "11:35", "club": "-", "kana": "たかはし ふみこ", "card": "7209591", "cardnote": "", "bus": "バス利用"}, {"no": "366", "cls": "W35A", "course": "5", "name": "澤本 佳那", "time": "12:00", "club": "静岡OLC", "kana": "さわもと かな", "card": "1310916", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "367", "cls": "W35A", "course": "5", "name": "田濃 藍", "time": "12:02", "club": "-", "kana": "たのう あい", "card": "7209593", "cardnote": "", "bus": ""}, {"no": "368", "cls": "W35A", "course": "5", "name": "和田 満美", "time": "12:04", "club": "ES関東C", "kana": "わだ まみ", "card": "7209594", "cardnote": "", "bus": "バス利用"}, {"no": "369", "cls": "W35A", "course": "5", "name": "折橋 明穂", "time": "12:06", "club": "京葉OLクラブ", "kana": "おりはし あきほ", "card": "7209595", "cardnote": "", "bus": "バス利用"}, {"no": "370", "cls": "W35A", "course": "5", "name": "長岡 花子", "time": "12:08", "club": "-", "kana": "ながおか はなこ", "card": "7209596", "cardnote": "", "bus": "バス利用"}, {"no": "371", "cls": "W35A", "course": "5", "name": "伊地知 遥", "time": "12:10", "club": "多摩OL", "kana": "いじち はるか", "card": "7209597", "cardnote": "", "bus": "バス利用"}, {"no": "372", "cls": "W35A", "course": "5", "name": "服部 泉", "time": "12:12", "club": "ES関東C", "kana": "はっとり いずみ", "card": "7209598", "cardnote": "", "bus": ""}, {"no": "373", "cls": "W35A", "course": "5", "name": "愛場 麻里子", "time": "12:14", "club": "-", "kana": "あいば まりこ", "card": "7209599", "cardnote": "", "bus": ""}, {"no": "374", "cls": "W35A", "course": "5", "name": "鈴木 香子", "time": "12:16", "club": "入間市OLC", "kana": "すずき きょうこ", "card": "7209600", "cardnote": "", "bus": "バス利用"}, {"no": "375", "cls": "W35A", "course": "5", "name": "今井 円香", "time": "12:18", "club": "上尾OLC", "kana": "いまい まどか", "card": "7209601", "cardnote": "", "bus": "バス利用"}, {"no": "376", "cls": "W50A", "course": "6", "name": "前中 美智", "time": "11:49", "club": "奈良市", "kana": "まえなか みち", "card": "7209602", "cardnote": "", "bus": "バス利用"}, {"no": "377", "cls": "W50A", "course": "6", "name": "小寺 遥子", "time": "11:51", "club": "入間市OLC", "kana": "こでら ようこ", "card": "7209603", "cardnote": "", "bus": ""}, {"no": "378", "cls": "W50A", "course": "6", "name": "舟木 明子", "time": "11:53", "club": "多摩OL", "kana": "ふなき あきこ", "card": "7209604", "cardnote": "", "bus": "バス利用"}, {"no": "379", "cls": "W50A", "course": "6", "name": "佐東 萌子", "time": "11:55", "club": "川越OLC", "kana": "さとう もえこ", "card": "7209605", "cardnote": "", "bus": "バス利用"}, {"no": "380", "cls": "W50A", "course": "6", "name": "岡田 洋子", "time": "11:57", "club": "入間市OLC", "kana": "おかだ ようこ", "card": "7209606", "cardnote": "", "bus": ""}, {"no": "381", "cls": "W65A", "course": "7", "name": "内海 みのり", "time": "12:24", "club": "Team白樺", "kana": "うつみ みのり", "card": "8201925", "cardnote": "マイカード", "bus": ""}, {"no": "382", "cls": "W65A", "course": "7", "name": "大塚 愛有", "time": "12:26", "club": "千葉OLK", "kana": "おおつか あゆ", "card": "7140977", "cardnote": "マイカード", "bus": ""}, {"no": "383", "cls": "W65A", "course": "7", "name": "宇野 亜美里", "time": "12:28", "club": "ワンダラーズ", "kana": "うの あみり", "card": "1396103", "cardnote": "マイカード", "bus": ""}, {"no": "384", "cls": "W65A", "course": "7", "name": "山崎 加与美", "time": "12:30", "club": "入間市OLC", "kana": "やまざき かよみ", "card": "9102205", "cardnote": "マイカード", "bus": ""}, {"no": "385", "cls": "W65A", "course": "7", "name": "金原 晴惠", "time": "12:32", "club": "上尾OLクラブ", "kana": "かねはら はるえ", "card": "9101064", "cardnote": "マイカード", "bus": ""}, {"no": "386", "cls": "W65A", "course": "7", "name": "殿垣 萌恵", "time": "12:34", "club": "ES関東", "kana": "とのがき もえ", "card": "9102202", "cardnote": "マイカード", "bus": "バス利用"}, {"no": "387", "cls": "WB", "course": "9", "name": "成田 みどり", "time": "11:39", "club": "ちーむとりけも", "kana": "なりた みどり", "card": "7209613", "cardnote": "", "bus": ""}, {"no": "388", "cls": "WB", "course": "9", "name": "高田 かおる", "time": "11:41", "club": "チームIKEIKE", "kana": "たかだ かおる", "card": "7209614", "cardnote": "", "bus": "バス利用"}, {"no": "389", "cls": "WB", "course": "9", "name": "平山 か代子", "time": "11:43", "club": "-", "kana": "ひらやま かよこ", "card": "7209615", "cardnote": "", "bus": "バス利用"}, {"no": "390", "cls": "WB", "course": "9", "name": "渋谷 尚美", "time": "11:45", "club": "厚木大学/ちーむとりけも", "kana": "しぶや なおみ", "card": "7209616", "cardnote": "", "bus": ""}, {"no": "1001", "cls": "初心者", "course": "10", "name": "小暮　勇登", "time": "", "club": "", "kana": "こぐれ ゆうと", "card": "7201001", "cardnote": "", "bus": ""}, {"no": "1002", "cls": "初心者", "course": "10", "name": "グエンティ　ホアイタム", "time": "", "club": "", "kana": "ぐえんてぃ ほあいたむ", "card": "7201002", "cardnote": "", "bus": ""}, {"no": "1003", "cls": "初心者", "course": "10", "name": "みずしまたつや", "time": "", "club": "", "kana": "みずしまたつや", "card": "7201003", "cardnote": "", "bus": ""}]};
+
+// ---------- 列定義 ----------
+const COLDEF = {
+  time:    {label:"スタート",   cls:"col-time", td:"time"},
+  name:    {label:"氏名",       cls:"col-name"},
+  club:    {label:"所属",       cls:"col-club"},
+  kana:    {label:"ふりがな",   cls:"col-kana"},
+  card:    {label:"カード番号", cls:"col-card", td:"num"},
+  cardnote:{label:"カード備考", cls:"col-note"},
+  cls:     {label:"クラス",     cls:"col-cls"},
+  bus:     {label:"バス",   cls:"col-bus", td:"center"},
+};
+const hasBus = !!DATA.has.bus;
+function colset(m){
+  const kana = document.getElementById("showKana").checked;
+  if(m==="bus") return ["kana","name","cls","time","club","card","cardnote"];
+  return ["time","name"].concat(kana?["kana"]:[], ["club","card","cardnote"], hasBus?["bus"]:[]);
+}
+let COLS = [];
+
+// ---------- 既定色 ----------
+const DEF = {
+  M:{stripe:"#eaf5fc", title:"#b9dcf2"},   // 男子：ごく薄い水色／薄め水色
+  W:{stripe:"#fdeaf7", title:"#f3b9e2"},   // 女子：ごく薄いマゼンタ／薄めマゼンタ
+  O:{stripe:"#f2f2f2", title:"#d5d5d5"},   // その他（初心者・混合・バス利用者リスト等）
+};
+let defColors = JSON.parse(JSON.stringify(DEF));
+let groupColors = {};      // {group: {stripe, title}}  個別指定
+const LS_KEY = "startlist-colors-v1";
+try{ const s=localStorage.getItem(LS_KEY); if(s){const o=JSON.parse(s); defColors=o.def||defColors; groupColors=o.grp||{};} }catch(e){}
+function saveColors(){ try{localStorage.setItem(LS_KEY, JSON.stringify({def:defColors, grp:groupColors}));}catch(e){} }
+
+// ---------- 状態 ----------
+const rows = DATA.rows.map((r,i)=>Object.assign({_i:i, _min:toMin(r.time)}, r));
+const hasCourse = DATA.has.course && rows.some(r=>r.course);
+let mode = "cls";
+let sortKey = "time", sortAsc = true;
+let colFilter = {};
+let groupEnabled = {};
+let myName = "";
+
+function toMin(t){ if(!t) return null; const m=/^(\d{1,2}):(\d{2})/.exec(t); return m? (+m[1])*60+(+m[2]) : null; }
+// フィルタ用のグループ（クラス or コース）。バス利用者リストではクラスで絞る
+function groupOf(r){ return mode==="course" ? (r.course||"(コースなし)") : (r.cls||"(クラスなし)"); }
+// 表示上のタイトル行グループ。バス利用者リストは1本のリスト
+function titleOf(r){ return mode==="bus" ? "バス利用者" : groupOf(r); }
+function genderOfGroup(g){
+  if(g==="バス利用者") return "O";
+  const members = rows.filter(r=>groupOf(r)===g);
+  const gs = new Set(members.map(r=>(r.cls||"").charAt(0).toUpperCase()));
+  if(gs.size===1 && gs.has("M")) return "M";
+  if(gs.size===1 && gs.has("W")) return "W";
+  const c=g.charAt(0).toUpperCase(); if(c==="M"||c==="W") return c;
+  return "O";
+}
+function colorsOf(g){ const d=defColors[genderOfGroup(g)]; const o=groupColors[g]||{}; return {stripe:o.stripe||d.stripe, title:o.title||d.title}; }
+function allGroups(){
+  const seen=new Set(); rows.forEach(r=>seen.add(groupOf(r)));
+  return [...seen].sort((a,b)=>a.localeCompare(b,"ja",{numeric:true}));
+}
+// タイトル行の表示名（コース別のときは「コース 3（M20A, W21A）」）
+function titleLabel(g){
+  if(mode!=="course") return g;
+  const cs=[...new Set(rows.filter(r=>groupOf(r)===g).map(r=>r.cls).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ja",{numeric:true}));
+  return `コース ${g}` + (cs.length? `（${cs.join(", ")}）` : "");
+}
+function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function norm(s){ return String(s??"").toLowerCase().replace(/[Ａ-Ｚａ-ｚ０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace(/[ァ-ン]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0x60)); }
+function isMyCard(r){ return /マイカード/.test(r.cardnote||""); }
+function isBus(r){ return !!(r.bus && r.bus.trim() && !/^(0|no|false|-|×|x)$/i.test(r.bus.trim())); }
+
+// ---------- 色入力（ピッカー＋16進テキスト） ----------
+function colorPair(value, onChange){
+  const w=document.createElement("span"); w.className="cp";
+  const c=document.createElement("input"); c.type="color"; c.value=value;
+  const t=document.createElement("input"); t.type="text"; t.value=value; t.placeholder="#rrggbb"; t.maxLength=7;
+  c.oninput=()=>{ t.value=c.value; t.classList.remove("bad"); onChange(c.value); };
+  t.oninput=()=>{ let v=t.value.trim(); if(/^[0-9a-f]{6}$/i.test(v)) v="#"+v;
+    if(/^#[0-9a-f]{3}$/i.test(v)) v="#"+v[1]+v[1]+v[2]+v[2]+v[3]+v[3];
+    if(/^#[0-9a-f]{6}$/i.test(v)){ t.classList.remove("bad"); c.value=v.toLowerCase(); onChange(v.toLowerCase()); } else t.classList.add("bad"); };
+  t.onblur=()=>{ if(t.classList.contains("bad")){ t.value=c.value; t.classList.remove("bad"); } };
+  w.appendChild(c); w.appendChild(t); return w;
+}
+
+// ---------- 初期化 ----------
+document.getElementById("title").textContent = DATA.title;
+document.title = DATA.title;
+const notes=[];
+if(!hasCourse){ document.getElementById("modeCourse").disabled=true; notes.push("CSVにコース列がないため、コース別は無効"); }
+if(!hasBus){ document.getElementById("modeBus").disabled=true; notes.push("CSVに「大会バス利用」列がないため、バス利用者表示は無効"); }
+document.getElementById("modeNote").textContent = notes.length? "（"+notes.join("／")+"）" : "";
+// 所属列の幅を最長データに合わせる（全角1文字≒1em、半角≒0.55em）
+(function(){ const w=Math.max(...rows.map(r=>[...String(r.club||"")].reduce((a,ch)=>a+(ch.charCodeAt(0)<256?0.55:1),0)),4);
+  document.documentElement.style.setProperty("--clubw",(Math.min(w,30)+1.5)+"em"); })();
+const dl=document.getElementById("nameList");
+[...new Set(rows.map(r=>r.name).filter(Boolean))].sort().forEach(n=>{const o=document.createElement("option");o.value=n;dl.appendChild(o);});
+
+document.querySelectorAll('input[name=mode]').forEach(el=>el.addEventListener("change",e=>setMode(e.target.value)));
+document.getElementById("myName").addEventListener("input",e=>{myName=e.target.value.trim(); render();});
+["winOn","winMin","clubQ","allQ","busOnly","cardMy","cardRental"].forEach(id=>document.getElementById(id).addEventListener("input",render));
+document.getElementById("showKana").addEventListener("change",()=>{ COLS=colset(mode).map(k=>Object.assign({key:k},COLDEF[k])); if(!COLS.some(c=>c.key===sortKey)){sortKey="time";sortAsc=true;} buildHeader(); render(); });
+if(!hasBus) document.getElementById("busOnly").disabled=true;
+function setMode(m){
+  mode=m; COLS=colset(m).map(k=>Object.assign({key:k},COLDEF[k]));
+  sortKey = (m==="bus")? "kana" : "time"; sortAsc=true; colFilter={};
+  buildHeader(); buildGroupChecks(); buildColorGrid(); render();
+}
+function setMyName(v){ document.getElementById("myName").value=v; myName=v; render(); }
+function resetFilters(){ colFilter={}; document.querySelectorAll("#flt input").forEach(i=>i.value=""); ["clubQ","allQ","myName"].forEach(id=>document.getElementById(id).value=""); myName=""; document.getElementById("winOn").checked=false; document.getElementById("busOnly").checked=false; document.getElementById("cardMy").checked=true; document.getElementById("cardRental").checked=true; checkAllGroups(true); }
+
+function buildGroupChecks(){
+  const box=document.getElementById("groupChecks"); box.innerHTML="";
+  const gs=allGroups(); const ne={};
+  gs.forEach(g=>{ ne[g]= (g in groupEnabled)? groupEnabled[g] : true;
+    const l=document.createElement("label"); const c=document.createElement("input"); c.type="checkbox"; c.checked=ne[g];
+    c.addEventListener("change",()=>{groupEnabled[g]=c.checked; render();});
+    l.appendChild(c); l.appendChild(document.createTextNode(" "+titleLabel(g))); box.appendChild(l); });
+  groupEnabled=ne;
+}
+function checkAllGroups(v){ allGroups().forEach(g=>groupEnabled[g]=v); document.querySelectorAll("#groupChecks input").forEach(c=>c.checked=v); render(); }
+
+function buildColorGrid(){
+  const row=document.getElementById("defColorRow"); row.innerHTML="";
+  [["M","男子 既定"],["W","女子 既定"],["O","その他"]].forEach(([k,lab])=>{
+    const l1=document.createElement("label"); l1.textContent=lab+" 背景 "; l1.appendChild(colorPair(defColors[k].stripe, v=>{defColors[k].stripe=v; saveColors(); render();})); row.appendChild(l1);
+    const l2=document.createElement("label"); l2.textContent="タイトル "; l2.appendChild(colorPair(defColors[k].title, v=>{defColors[k].title=v; saveColors(); render();})); l2.style.marginRight="10px"; row.appendChild(l2);
+  });
+  const b=document.createElement("button"); b.textContent="既定に戻す"; b.onclick=resetColors; row.appendChild(b);
+  const grid=document.getElementById("colorGrid"); grid.innerHTML="";
+  const hd=(t)=>{const d=document.createElement("div");d.className="hd";d.textContent=t;grid.appendChild(d);};
+  hd(mode==="course"?"コース":"クラス"); hd("背景色（1行おき）"); hd("タイトル色");
+  const gs = mode==="bus" ? ["バス利用者"] : allGroups();
+  gs.forEach(g=>{
+    const c=colorsOf(g);
+    const n=document.createElement("div"); n.textContent=titleLabel(g); grid.appendChild(n);
+    grid.appendChild(colorPair(c.stripe, v=>{(groupColors[g]=groupColors[g]||{}).stripe=v; saveColors(); render();}));
+    grid.appendChild(colorPair(c.title,  v=>{(groupColors[g]=groupColors[g]||{}).title=v;  saveColors(); render();}));
+  });
+}
+function resetColors(){ defColors=JSON.parse(JSON.stringify(DEF)); groupColors={}; saveColors(); buildColorGrid(); render(); }
+
+// ---------- ヘッダ ----------
+function buildHeader(){
+  const h=document.getElementById("hdr"), f=document.getElementById("flt"); h.innerHTML=""; f.innerHTML="";
+  COLS.forEach(c=>{
+    const th=document.createElement("th"); th.className=c.cls; th.innerHTML=esc(c.label)+(sortKey===c.key?`<span class="arrow">${sortAsc?"▲":"▼"}</span>`:"");
+    th.onclick=()=>{ if(sortKey===c.key) sortAsc=!sortAsc; else {sortKey=c.key; sortAsc=true;} buildHeader(); render(); };
+    h.appendChild(th);
+    const tf=document.createElement("th");
+    if(c.key!=="cardnote" && c.key!=="bus"){ const inp=document.createElement("input"); inp.type="text"; inp.placeholder="フィルタ"; inp.value=colFilter[c.key]||"";
+      inp.oninput=()=>{colFilter[c.key]=inp.value; render();}; tf.appendChild(inp); }
+    f.appendChild(tf);
+  });
+}
+
+// ---------- 描画 ----------
+function render(){
+  const winOn=document.getElementById("winOn").checked, winMin=+document.getElementById("winMin").value||0;
+  const clubQ=norm(document.getElementById("clubQ").value.trim()), allQ=norm(document.getElementById("allQ").value.trim());
+  const me = myName ? rows.find(r=>r.name===myName) || rows.find(r=>norm(r.name).includes(norm(myName))) : null;
+  const center = me? me._min : null;
+  const busOnly = document.getElementById("busOnly").checked;
+  const cardMy = document.getElementById("cardMy").checked, cardRental = document.getElementById("cardRental").checked;
+  const SEARCH_KEYS=["time","name","club","kana","card","cardnote","cls","course","no","bus"];
+
+  let list = rows.filter(r=>{
+    if((mode==="bus" || busOnly) && !isBus(r)) return false;
+    if(isMyCard(r) ? !cardMy : !cardRental) return false;
+    if(!groupEnabled[groupOf(r)]) return false;
+    if(clubQ && !norm(r.club).includes(clubQ)) return false;
+    if(allQ && !SEARCH_KEYS.some(k=>norm(r[k]).includes(allQ))) return false;
+    for(const c of COLS){ const q=norm((colFilter[c.key]||"").trim()); if(q && !norm(r[c.key]).includes(q)) return false; }
+    if(winOn && center!==null){ if(r._min===null) return false; if(Math.abs(r._min-center)>winMin) return false; }
+    return true;
+  });
+  // 並べ替え（タイトル行グループ内）
+  const cmp=(a,b)=>{
+    let va=a[sortKey], vb=b[sortKey];
+    if(sortKey==="time"){ va=a._min??1e9; vb=b._min??1e9; }
+    else if(sortKey==="card"){ va=+va||va; vb=+vb||vb; }
+    else { va=norm(va); vb=norm(vb); if(va===""&&vb!=="") return sortAsc?1:-1; if(vb===""&&va!=="") return sortAsc?-1:1; }
+    let c = (typeof va==="number"&&typeof vb==="number")? va-vb : String(va).localeCompare(String(vb),"ja");
+    if(c===0) c=(a._min??1e9)-(b._min??1e9) || a._i-b._i;
+    return sortAsc? c : -c;
+  };
+  const titles = mode==="bus" ? ["バス利用者"] : allGroups();
+  const by={}; list.forEach(r=>(by[titleOf(r)]=by[titleOf(r)]||[]).push(r));
+  const tb=document.getElementById("body"); const parts=[];
+  titles.forEach(g=>{
+    const rs=by[g]; if(!rs) return; rs.sort(cmp); const col=colorsOf(g);
+    parts.push(`<tr class="gtitle" style="background:${col.title}"><td colspan="${COLS.length}">${esc(titleLabel(g))}<span class="cnt">${rs.length}名</span></td></tr>`);
+    rs.forEach((r,i)=>{
+      const bg = i%2===1 ? ` style="background:${col.stripe}"` : "";
+      const mine = me && r._i===me._i ? ' class="mine"' : "";
+      parts.push(`<tr${mine}${bg}>`+COLS.map(c=>{
+        let v = r[c.key]; if(c.key==="bus") v = isBus(r) ? "○" : "";
+        return `<td class="${c.td||""}">${esc(v)}</td>`; }).join("")+`</tr>`);
+    });
+  });
+  tb.innerHTML = parts.length? parts.join("") : `<tr><td colspan="${COLS.length}" class="empty">該当者がいません</td></tr>`;
+  const tbl=document.getElementById("tbl"); tbl.classList.toggle("hasbus", hasBus && mode!=="bus"); tbl.classList.toggle("busmode", mode==="bus");
+  const st=[`表示 ${list.length} 名 / 全 ${mode==="bus"? rows.filter(isBus).length+" 名（バス利用）" : rows.length+" 名"}`];
+  if(myName && !me) st.push(`「${myName}」は見つかりません`);
+  if(me) st.push(`自分：${me.name}（${me.cls}${me.time?" "+me.time:""}）`);
+  if(winOn && me && center===null) st.push("自分のスタート時刻が未設定のため前後絞込みは無効");
+  document.getElementById("status").textContent=st.join("　｜　");
+  const MODE_LABEL={cls:"クラス別・スタート時刻順", course:"コース別・スタート時刻順", bus:"大会バス利用者（ふりがな順）"};
+  const sub=[MODE_LABEL[mode]];
+  if(sortKey!==(mode==="bus"?"kana":"time")) sub.push(`${COLDEF[sortKey].label}順${sortAsc?"":"（降順）"}`);
+  if(winOn&&me&&center!==null) sub.push(`${me.name} の前後${winMin}分`);
+  if(clubQ) sub.push(`所属「${document.getElementById("clubQ").value.trim()}」`);
+  if(busOnly && mode!=="bus") sub.push("バス利用者のみ");
+  if(cardMy && !cardRental) sub.push("マイカードのみ"); if(!cardMy && cardRental) sub.push("レンタルカードのみ");
+  document.getElementById("subtitle").textContent=sub.join("　／　");
+}
+
+setMode("cls");
+</script>
+</body>
+</html>
