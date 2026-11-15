@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>全日本ミドル2026 スタート時刻を変えたら（クラス別 What-if）</title>
+<style>
+.viz-root{--surface:#fcfcfb;--panel:#f3f2ee;--tp:#0b0b0b;--ts:#52514e;--grid:#e4e3dd;--axis:#b9b8b0;--c0:#77766f;--c1:#2a78d6;--c2:#eb6834;--band:#f6f5f1}
+@media (prefers-color-scheme:dark){.viz-root{--surface:#1a1a19;--panel:#262624;--tp:#f0efec;--ts:#c3c2b7;--grid:#33332f;--axis:#55544e;--c0:#a5a49c;--c1:#3987e5;--c2:#d95926;--band:#20201f}}
+*{box-sizing:border-box}html,body{margin:0}
+body.viz-root{background:var(--surface);color:var(--tp);font-family:"Noto Sans CJK JP","Noto Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;font-size:14px;line-height:1.6;padding:20px 24px 40px;max-width:1180px;margin:0 auto}
+h1{font-size:21px;margin:0 0 2px}.sub{color:var(--ts);font-size:13px;margin-bottom:16px}
+h2{font-size:16px;margin:30px 0 8px;padding-left:10px;border-left:6px solid var(--c1)}
+p.lead{margin:4px 0 8px;font-size:13px;color:var(--ts);max-width:900px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.card{background:var(--panel);border-radius:8px;padding:12px 14px;border-top:5px solid var(--k)}
+.card h3{margin:0 0 6px;font-size:15px}
+.card dl{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin:0;font-variant-numeric:tabular-nums}
+.card dt{color:var(--ts);font-size:12.5px;align-self:end}.card dd{margin:0;text-align:right;font-size:22px;font-weight:700;line-height:1.3}
+.card dd small{font-size:12px;font-weight:400;color:var(--ts);margin-left:4px}
+.card .d{grid-column:1/3;font-size:12px;color:var(--ts);text-align:right;margin-top:-3px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px;color:var(--ts);margin:4px 0}
+.legend i{display:inline-block;width:18px;height:0;border-top:3px solid;margin-right:6px;vertical-align:4px}
+.wrap{position:relative}svg{display:block;width:100%;height:auto}svg text{font-family:inherit;fill:var(--ts);font-size:12px}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--axis);border-radius:6px;padding:8px 10px;font-size:12.5px;box-shadow:0 2px 8px rgba(0,0,0,.15);display:none;min-width:200px;font-variant-numeric:tabular-nums;z-index:5}
+.tip table{border-collapse:collapse;width:100%}.tip td{padding:1px 0}.tip td:last-child{text-align:right;padding-left:14px}
+.tip i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.seg{display:inline-flex;border:1px solid var(--axis);border-radius:6px;overflow:hidden;margin:4px 0 6px}
+.seg button{font:inherit;font-size:13px;padding:5px 14px;border:0;background:var(--surface);color:var(--tp);cursor:pointer;border-right:1px solid var(--axis)}
+.seg button:last-child{border-right:0}.seg button.on{background:var(--k);color:#fff;font-weight:700}
+table.d{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12.5px}
+table.d th,table.d td{border:1px solid var(--axis);padding:2px 8px;text-align:right;white-space:nowrap}
+table.d th{background:var(--panel);font-weight:600;text-align:center}table.d td.l{text-align:left}
+table.d tr.ls td{border-top:2px solid var(--ts)}
+td.e{color:var(--c1);font-weight:700}td.w{color:var(--ts)}
+.note{font-size:12.5px;color:var(--ts);max-width:920px;padding-left:18px}.note li{margin-bottom:3px}
+@media(max-width:800px){.cards{grid-template-columns:1fr}}
+</style></head>
+<body class="viz-root">
+<h1>スタート時刻がこうであったら ― クラス別 What-if 分析</h1>
+<div class="sub">第15回全日本オリエンテーリング選手権大会（ミドル）2026年10月31日 中山高原　／　各選手の所要タイムは実績のまま、クラスのスタート枠（開始時刻・レーン内の順番）だけを動かした場合の試算</div>
+<div class="cards" id="cards"></div>
+<h2>① ゴールの混み具合：フィニッシュ到着数（直近5分間の人数）</h2>
+<p class="lead">各時刻の「直前5分間にフィニッシュした人数」。山が低く平らなほど、フィニッシュ・読み取り・成績処理の負荷が分散します。欠席者は含みません。</p>
+<div class="legend" id="lg1"></div>
+<div class="wrap"><svg id="ch1" viewBox="0 0 1100 360"></svg><div class="tip"></div></div>
+<h2>② 未帰還者数の推移</h2>
+<p class="lead">スタート済みでまだ帰還していない人数。欠席者（43人）は前回と同じく、スタート時刻から 13:15 まで未帰還に数えています。</p>
+<div class="legend" id="lg2"></div>
+<div class="wrap"><svg id="ch2" viewBox="0 0 1100 360"></svg><div class="tip"></div></div>
+<h2>クラス別スタート枠とフィニッシュ時間帯</h2>
+<p class="lead">太い帯＝そのクラスのスタート時間帯、細い帯＝そのクラスの最初の帰還〜最後の帰還。枠線だけの帯は As-Is（実際）のスタート時間帯です。帯にカーソルを合わせると詳細が出ます。</p>
+<div class="seg" id="seg"></div>
+<div class="wrap"><svg id="gantt"></svg><div class="tip"></div></div>
+<h2>クラス別の一覧</h2>
+<div style="overflow-x:auto"><table class="d" id="tbl"></table></div>
+<h2>試算の前提</h2>
+<ul class="note">
+<li><b>動かしたもの</b>：各クラスのスタート枠の開始時刻と、同じレーン内でのクラスの順番。</li>
+<li><b>固定したもの</b>：各選手の所要タイム（実績）、クラス内のスタート順と間隔、クラスのレーン割り（10レーン）、スタート時間帯（10:00〜12:45）。同一レーンのクラス間は実際と同じく2分以上空け、レーン1・2（M21E/W21E、M20E/W20E）は実際と同じ交互スタートを認めています。</li>
+<li><b>① ゴールピーク最小</b>：「直近5分間のフィニッシュ人数」の最大値が最も小さくなる組み合わせ。<b>② 全員帰還最早</b>：最後の帰還時刻が最も早くなる組み合わせ（その中でピークが低いもの）。②の最早時刻はレーンごとに厳密に求めた値、ピークは反復探索で得た最良値で、理論上の下限とは限りません。</li>
+<li>タイムのない失格等（79人）はクラスの中央値タイムでフィニッシュしたものとして計算。欠席者はフィニッシュ到着数に含めず、「全員帰還」も実際に走った人だけで判定しています。</li>
+<li>スタート時刻が変われば気象・渋滞・追走の影響でタイムも変わり得ますが、ここでは考慮していません。</li>
+</ul>
+<script>
+const D={"sc":[{"key":"asis","lab":"As-Is（実際）","S":{"M15A":36,"M18A":51,"M20A":0,"M20E":57,"M21A1":0,"M21A2":0,"M21AS":20,"M21E":5,"M35A":0,"M40A":12,"M45A":36,"M50A":44,"M55A":96,"M60A":115,"M65A":50,"M70A":100,"M75A":8,"M80A":33,"M85A":106,"M90A":27,"M95A":75,"MA":72,"MBL":0,"MBS":61,"MCL":130,"MCS":111,"MN":89,"W10":86,"W12":81,"W15A":73,"W18A":101,"W20A":89,"W20E":90,"W21A":0,"W21AS":125,"W21E":68,"W35A":87,"W40A":92,"W45A":96,"W50A":115,"W55A":135,"W60A":0,"W65A":21,"W70A":82,"W75A":130,"WA":103,"WBL":27,"WBS":67,"WCL":139,"WCS":122,"WN":104},"pk":50,"pkAt":106,"last":14750,"roll":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,3,3,3,3,3,2,3,2,6,6,9,12,15,13,16,12,14,11,13,11,13,17,23,21,26,36,31,32,37,35,25,30,29,26,26,30,24,21,24,28,25,28,31,31,32,33,35,32,31,27,31,28,31,32,33,30,28,27,25,31,33,33,30,33,29,25,26,43,44,46,47,50,37,42,41,43,47,46,42,38,35,33,34,26,30,38,37,34,36,32,26,22,27,30,33,37,40,36,38,35,33,29,29,29,29,28,32,39,38,40,40,40,33,33,37,38,39,42,45,39,39,36,34,34,33,28,26,31,28,35,39,47,41,37,36,34,34,35,40,35,43,41,48,43,39,38,35,28,27,33,25,25,23,23,26,25,21,25,24,24,28,30,27,27,17,13,9,10,9,12,10,9,4,4,2,2,3,4,3,2,6,5,4,5,5,1,2,3,2,3,7,6,5,6,5,1,1,1,0,0,0,1,2,2,2,2,1,0,2,3,3,4,4,2,1,1,0,0,0,0,0,0,0],"un":[7,14,21,28,35,43,50,57,64,72,79,86,93,101,108,116,123,131,138,145,151,159,166,174,181,189,194,202,208,215,221,228,233,241,247,250,256,262,268,276,281,287,293,295,301,305,307,311,315,319,325,328,335,339,345,351,348,352,357,360,354,357,358,361,364,371,367,370,373,378,379,382,385,386,385,391,391,393,393,391,393,392,395,398,399,398,398,399,398,400,402,405,407,410,406,405,407,414,413,412,416,419,406,404,402,405,406,407,401,398,398,393,395,392,391,395,391,392,397,394,390,386,391,393,395,396,397,396,396,394,393,391,394,391,392,391,395,396,393,395,396,395,389,388,386,386,383,384,380,374,369,362,357,348,344,340,336,333,323,320,318,315,305,298,287,282,270,266,262,252,248,236,231,222,217,205,195,183,179,178,167,160,155,152,145,142,135,132,129,119,117,114,107,105,95,46,41,37,35,35,33,32,27,26,23,23,23,23,22,21,21,20,19,19,19,15,15,15,14,14,14,13,12,12,11,7,7,7,6,6,6,6,6,6,6,6,5,4,4,4,4,4,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0],"unPk":419,"unAt":101,"lastStart":165},{"key":"p1","lab":"① ゴールピーク最小","S":{"M21E":2,"W21E":67,"M20E":0,"W20E":25,"M21A1":16,"M21A2":9,"M45A":68,"M50A":1,"M35A":30,"M21AS":146,"M40A":88,"W21A":50,"M60A":3,"M55A":147,"W55A":129,"M70A":99,"W50A":50,"W40A":153,"M65A":0,"W35A":63,"W21AS":157,"W45A":84,"MCS":109,"WCL":119,"W15A":25,"WCS":33,"WBS":151,"MBL":123,"WBL":158,"MBS":81,"M15A":0,"W12":102,"W10":43,"WN":49,"MCL":93,"MN":62,"M18A":62,"M20A":87,"W20A":17,"MA":0,"WA":51,"W18A":31,"W65A":1,"W60A":137,"M85A":7,"M80A":41,"M75A":150,"W70A":113,"W75A":80,"M95A":146,"M90A":165},"pk":33,"pkAt":63,"last":14395,"roll":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,4,4,4,4,4,2,6,6,5,5,5,4,7,9,9,10,8,7,7,8,8,13,13,16,18,18,13,13,11,13,15,18,19,20,20,21,23,30,30,33,30,30,24,26,24,27,27,28,32,32,32,30,32,30,29,29,31,29,27,30,31,27,27,26,27,28,30,27,30,31,29,26,33,31,27,27,32,30,29,28,31,30,27,25,29,29,29,30,32,31,29,28,25,24,24,27,28,30,31,29,29,28,28,29,31,28,32,32,29,28,29,27,31,32,31,31,30,27,26,27,29,29,29,33,29,28,30,28,25,28,26,26,30,30,30,33,31,32,32,30,28,28,28,28,32,29,28,30,31,27,33,32,28,33,32,26,31,30,25,28,29,30,31,31,30,30,24,24,25,24,29,29,29,30,30,26,28,30,27,29,27,28,23,26,24,24,22,24,21,21,22,20,17,15,13,10,12,11,10,11,12,10,11,13,10,9,7,6,4,5,3,9,8,10,11,12,9,9,6,4,3,0,0,0,0,0,0,0,0,0,0,0,0,0],"un":[4,9,16,22,30,36,43,49,56,62,70,76,84,91,99,105,113,120,129,137,146,153,161,168,173,181,189,195,202,207,211,218,225,232,238,242,245,249,255,259,264,267,270,274,277,275,278,277,278,280,285,290,294,297,300,302,306,307,308,308,307,301,304,302,307,309,313,313,315,317,319,322,320,321,324,326,324,323,324,324,324,326,326,322,324,328,330,330,328,327,330,334,334,331,332,337,333,332,331,334,334,333,335,336,335,336,338,341,338,337,338,340,341,340,339,341,344,346,343,341,341,343,343,343,340,343,345,345,343,344,343,347,351,351,351,352,351,353,355,355,357,358,361,360,356,355,356,355,358,355,354,358,361,363,365,366,365,367,368,366,368,365,366,366,363,362,354,350,342,338,334,324,319,315,305,302,295,286,283,279,271,266,261,255,250,241,235,230,225,219,217,211,205,201,191,145,139,132,128,122,117,109,105,99,95,89,86,79,75,71,67,62,58,54,49,47,45,43,41,39,35,34,32,30,27,25,23,20,20,18,18,17,16,15,15,9,9,6,4,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"unPk":368,"unAt":158,"lastStart":165},{"key":"p2","lab":"② 全員帰還最早","S":{"M21E":4,"W21E":75,"M20E":0,"W20E":5,"M21A1":2,"M21A2":5,"M45A":84,"M50A":1,"M35A":53,"M21AS":139,"M40A":159,"W21A":0,"M60A":96,"M55A":141,"W55A":54,"M70A":119,"W50A":134,"W40A":109,"M65A":2,"W35A":150,"W21AS":157,"W45A":77,"MCS":121,"WCL":94,"W15A":131,"WCS":111,"WBS":146,"MBL":41,"WBL":152,"MBS":161,"M15A":0,"W12":90,"W10":104,"WN":83,"MCL":25,"MN":68,"M18A":59,"M20A":93,"W20A":32,"MA":0,"WA":46,"W18A":23,"W65A":64,"W60A":131,"M85A":105,"M80A":0,"M75A":144,"W70A":71,"W75A":50,"M95A":139,"M90A":103},"pk":34,"pkAt":62,"last":14031,"roll":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,4,4,4,4,4,2,6,6,5,5,5,4,7,9,10,10,8,8,8,9,9,11,12,16,17,17,17,15,10,10,12,17,20,22,27,31,31,32,34,34,31,28,27,28,27,29,29,31,33,31,30,31,31,29,31,31,29,30,27,26,30,31,29,29,29,25,26,24,30,29,31,32,33,31,30,31,30,31,33,32,33,31,33,31,32,27,33,29,25,27,34,29,28,30,30,25,24,29,29,31,29,31,28,32,27,27,30,28,28,32,33,27,30,27,26,26,30,28,27,29,33,31,33,32,30,28,32,32,31,29,29,27,29,33,34,30,34,31,29,27,29,26,26,28,29,31,28,28,29,30,31,29,33,33,32,32,34,33,30,31,31,31,28,26,28,23,23,23,27,23,26,29,31,30,29,31,25,23,22,26,22,23,26,23,18,21,22,17,16,19,17,15,14,17,15,12,12,10,10,10,8,7,9,7,5,10,12,10,10,12,11,8,8,6,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"un":[5,9,16,22,30,38,48,56,65,73,82,90,100,108,117,125,133,140,149,156,164,171,178,186,191,197,203,208,214,219,222,228,235,241,247,250,255,259,264,268,273,276,281,284,289,291,294,294,298,303,308,312,317,320,325,324,328,331,331,331,332,333,338,337,341,344,347,346,347,345,347,345,344,343,345,344,343,345,346,346,347,344,346,346,342,344,344,347,347,348,349,349,346,346,345,342,343,340,342,339,338,337,333,336,333,335,332,330,331,333,329,333,335,335,329,330,332,333,333,333,335,334,335,335,337,338,338,337,340,343,340,345,344,344,347,352,354,355,355,357,357,360,362,359,355,357,358,361,362,362,361,362,366,369,367,364,359,356,355,356,348,347,346,347,346,341,336,329,325,318,313,308,300,295,287,284,275,267,263,255,250,242,237,232,224,219,214,211,204,201,196,191,184,181,175,124,117,111,109,101,99,94,89,83,79,76,68,66,64,58,54,51,50,46,41,38,37,33,31,29,27,27,23,21,21,20,18,16,16,11,8,8,6,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"unPk":369,"unAt":153,"lastStart":165}],"cl":[{"c":"M21E","lane":1,"n":81,"dns":1,"len":160,"iv":2,"ff":3029,"tail":11775,"med":2498,"mx":5430},{"c":"W21E","lane":1,"n":45,"dns":3,"len":88,"iv":2,"ff":3377,"tail":8799,"med":3137,"mx":6700},{"c":"M20E","lane":2,"n":47,"dns":0,"len":92,"iv":2,"ff":2184,"tail":7604,"med":2285,"mx":4820},{"c":"W20E","lane":2,"n":26,"dns":0,"len":50,"iv":2,"ff":2574,"tail":7468,"med":2454,"mx":5109},{"c":"M21A1","lane":3,"n":150,"dns":5,"len":149,"iv":1,"ff":2761,"tail":13219,"med":2826,"mx":5592},{"c":"M21A2","lane":4,"n":150,"dns":7,"len":149,"iv":1,"ff":2566,"tail":12232,"med":3083,"mx":6114},{"c":"M35A","lane":5,"n":11,"dns":0,"len":10,"iv":1,"ff":2063,"tail":6461,"med":2897,"mx":6221},{"c":"M40A","lane":5,"n":7,"dns":1,"len":6,"iv":1,"ff":1928,"tail":3101,"med":2744,"mx":2981},{"c":"M21AS","lane":5,"n":15,"dns":1,"len":14,"iv":1,"ff":2281,"tail":5635,"med":2964,"mx":5455},{"c":"M45A","lane":5,"n":7,"dns":0,"len":6,"iv":1,"ff":1983,"tail":8721,"med":3456,"mx":8541},{"c":"M50A","lane":5,"n":24,"dns":1,"len":23,"iv":1,"ff":2034,"tail":7470,"med":2734,"mx":6750},{"c":"W21A","lane":6,"n":95,"dns":4,"len":94,"iv":1,"ff":2527,"tail":11320,"med":3484,"mx":7840},{"c":"M55A","lane":6,"n":18,"dns":1,"len":17,"iv":1,"ff":2871,"tail":5571,"med":3529,"mx":5271},{"c":"M60A","lane":6,"n":44,"dns":3,"len":43,"iv":1,"ff":2504,"tail":7850,"med":2914,"mx":6350},{"c":"M65A","lane":7,"n":36,"dns":2,"len":35,"iv":1,"ff":2329,"tail":6520,"med":2554,"mx":5759},{"c":"W35A","lane":7,"n":4,"dns":0,"len":3,"iv":1,"ff":2102,"tail":4303,"med":2351,"mx":4123},{"c":"W40A","lane":7,"n":3,"dns":0,"len":2,"iv":1,"ff":3401,"tail":4762,"med":3401,"mx":4702},{"c":"W45A","lane":7,"n":3,"dns":0,"len":2,"iv":1,"ff":3165,"tail":3522,"med":3253,"mx":3402},{"c":"M70A","lane":7,"n":14,"dns":0,"len":13,"iv":1,"ff":2371,"tail":6450,"med":3101,"mx":6450},{"c":"W50A","lane":7,"n":9,"dns":0,"len":8,"iv":1,"ff":2599,"tail":5973,"med":3496,"mx":5493},{"c":"W21AS","lane":7,"n":9,"dns":1,"len":8,"iv":1,"ff":1997,"tail":4096,"med":2973,"mx":4096},{"c":"W55A","lane":7,"n":12,"dns":0,"len":11,"iv":1,"ff":2373,"tail":6482,"med":3140,"mx":6093},{"c":"MBL","lane":8,"n":26,"dns":5,"len":25,"iv":1,"ff":2672,"tail":6234,"med":3305,"mx":5323},{"c":"WBL","lane":8,"n":8,"dns":0,"len":7,"iv":1,"ff":2812,"tail":4742,"med":3514,"mx":4742},{"c":"M15A","lane":8,"n":24,"dns":0,"len":23,"iv":1,"ff":1392,"tail":4540,"med":1883,"mx":3942},{"c":"MBS","lane":8,"n":5,"dns":0,"len":4,"iv":1,"ff":2369,"tail":4201,"med":3075,"mx":3961},{"c":"WBS","lane":8,"n":5,"dns":0,"len":4,"iv":1,"ff":2891,"tail":5003,"med":4325,"mx":4943},{"c":"W15A","lane":8,"n":6,"dns":0,"len":5,"iv":1,"ff":1285,"tail":5839,"med":1943,"mx":5599},{"c":"W12","lane":8,"n":2,"dns":0,"len":2,"iv":2,"ff":2772,"tail":2773,"med":2712,"mx":2772},{"c":"W10","lane":8,"n":1,"dns":0,"len":0,"iv":0,"ff":2374,"tail":2374,"med":2374,"mx":2374},{"c":"MN","lane":8,"n":7,"dns":0,"len":12,"iv":2,"ff":845,"tail":1999,"med":1135,"mx":1759},{"c":"WN","lane":8,"n":3,"dns":1,"len":4,"iv":2,"ff":2040,"tail":2426,"med":2053,"mx":2186},{"c":"MCS","lane":8,"n":5,"dns":0,"len":8,"iv":2,"ff":2391,"tail":6737,"med":4727,"mx":6737},{"c":"WCS","lane":8,"n":4,"dns":0,"len":6,"iv":2,"ff":2922,"tail":5346,"med":3782,"mx":4986},{"c":"MCL","lane":8,"n":4,"dns":0,"len":6,"iv":2,"ff":1786,"tail":2146,"med":1786,"mx":1786},{"c":"WCL","lane":8,"n":2,"dns":0,"len":2,"iv":2,"ff":3751,"tail":5852,"med":4741,"mx":5852},{"c":"M20A","lane":9,"n":50,"dns":3,"len":49,"iv":1,"ff":1877,"tail":8379,"med":2465,"mx":7170},{"c":"M18A","lane":9,"n":20,"dns":0,"len":19,"iv":1,"ff":2147,"tail":6692,"med":2651,"mx":5792},{"c":"MA","lane":9,"n":16,"dns":0,"len":15,"iv":1,"ff":1306,"tail":5482,"med":1788,"mx":4822},{"c":"W20A","lane":9,"n":11,"dns":1,"len":10,"iv":1,"ff":1859,"tail":5644,"med":2640,"mx":5404},{"c":"W18A","lane":9,"n":1,"dns":1,"len":0,"iv":0,"ff":null,"tail":null,"med":null,"mx":null},{"c":"WA","lane":9,"n":6,"dns":0,"len":5,"iv":1,"ff":1799,"tail":3619,"med":2620,"mx":3319},{"c":"W60A","lane":10,"n":7,"dns":1,"len":6,"iv":1,"ff":2537,"tail":5628,"med":4941,"mx":5268},{"c":"M75A","lane":10,"n":12,"dns":1,"len":11,"iv":1,"ff":2191,"tail":5361,"med":2979,"mx":4762},{"c":"W65A","lane":10,"n":5,"dns":0,"len":4,"iv":1,"ff":2804,"tail":5549,"med":3267,"mx":5429},{"c":"M90A","lane":10,"n":1,"dns":0,"len":0,"iv":0,"ff":2884,"tail":2884,"med":null,"mx":null},{"c":"M80A","lane":10,"n":7,"dns":0,"len":36,"iv":6,"ff":2240,"tail":7022,"med":2663,"mx":5222},{"c":"M95A","lane":10,"n":1,"dns":0,"len":0,"iv":0,"ff":4488,"tail":4488,"med":4488,"mx":4488},{"c":"W70A","lane":10,"n":4,"dns":0,"len":18,"iv":6,"ff":2761,"tail":5600,"med":3147,"mx":5600},{"c":"M85A","lane":10,"n":4,"dns":0,"len":18,"iv":6,"ff":2658,"tail":6172,"med":2771,"mx":5812},{"c":"W75A","lane":10,"n":3,"dns":0,"len":12,"iv":6,"ff":2365,"tail":5230,"med":4510,"mx":4739}]};const SC=D.sc,CL=D.cl,COL=['var(--c0)','var(--c1)','var(--c2)'];
+const hm=m=>(10+Math.floor(m/60))+':'+String(Math.floor(m%60)).padStart(2,'0');
+const hms=s=>(10+Math.floor(s/3600))+':'+String(Math.floor(s%3600/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+const dur=s=>s==null?'–':Math.floor(s/3600)+':'+String(Math.floor(s%3600/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+const NM=255,A=SC[0];
+// cards
+document.getElementById('cards').innerHTML=SC.map((s,i)=>{const dp=s.pk-A.pk,dl=Math.round((s.last-A.last)/60),du=s.unPk-A.unPk;
+ return `<div class="card" style="--k:${COL[i]}"><h3>${s.lab}</h3><dl>
+ <dt>ゴールピーク（5分間）</dt><dd>${s.pk}<small>人</small></dd><div class="d">${i?`実際より ${dp} 人（${Math.round(dp/A.pk*100)}%）`:hm(s.pkAt)+' ごろ'}</div>
+ <dt>全員帰還（実走者）</dt><dd>${hms(s.last)}</dd><div class="d">${i?`実際より ${-dl} 分早い`:'スタート開始から4時間5分'}</div>
+ <dt>未帰還者数のピーク</dt><dd>${s.unPk}<small>人</small></dd><div class="d">${i?`実際より ${du>0?'+':''}${du} 人`:hm(s.unAt)+' ごろ'}</div>
+ <dt>最終スタート</dt><dd style="font-size:17px">${hm(s.lastStart)}</dd></dl></div>`}).join('');
+const lg=SC.map((s,i)=>`<span><i style="border-color:${COL[i]};${i?'':'border-top-style:dashed'}"></i>${s.lab}</span>`).join('');
+lg1.innerHTML=lg;lg2.innerHTML=lg;
+function line(id,key,ymax,ystep,unit,marks){
+  const W=1100,H=360,L=50,R=150,T=24,B=40,pw=W-L-R,ph=H-T-B,X=m=>L+m/NM*pw,Y=v=>T+ph-v/ymax*ph,svg=document.getElementById(id);
+  let h='';for(let v=0;v<=ymax;v+=ystep)h+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end">${v}</text>`;
+  for(let m=0;m<=NM;m+=15){const b=m%30==0;h+=`<line x1="${X(m)}" x2="${X(m)}" y1="${T+ph}" y2="${T+ph+(b?6:3)}" stroke="var(--axis)"/>`;if(b)h+=`<text x="${X(m)}" y="${T+ph+21}" text-anchor="middle">${hm(m)}</text>`}
+  h+=`<text x="${L-8}" y="${T-9}" text-anchor="end">${unit}</text><line x1="${L}" x2="${W-R}" y1="${T+ph}" y2="${T+ph}" stroke="var(--axis)"/>`;
+  SC.forEach((s,i)=>{const a=s[key];h+=`<path d="${a.map((v,m)=>(m?'L':'M')+X(m)+','+Y(v)).join('')}" fill="none" stroke="${COL[i]}" stroke-width="${i?2.2:1.8}" ${i?'':'stroke-dasharray="5 3"'} stroke-linejoin="round"/>`});
+  marks.forEach(([i,m,v,lab,dy])=>{h+=`<circle cx="${X(m)}" cy="${Y(v)}" r="4" fill="${COL[i]}" stroke="var(--surface)" stroke-width="2"/>`});
+  // right-side labels
+  marks.forEach(([i,m,v,lab],j)=>{h+=`<rect x="${W-R+10}" y="${T+8+j*40}" width="10" height="10" rx="2" fill="${COL[i]}"/><text x="${W-R+25}" y="${T+17+j*40}" style="fill:var(--tp);font-weight:700">${lab}</text><text x="${W-R+25}" y="${T+32+j*40}">${['実際','①','②'][i]}・${hm(m)}</text>`});
+  h+=`<g class="cr" style="display:none"><line y1="${T}" y2="${T+ph}" stroke="var(--tp)" opacity=".5"/>${SC.map((s,i)=>`<circle r="4" fill="${COL[i]}" stroke="var(--surface)" stroke-width="2"/>`).join('')}</g><rect class="hit" x="${L}" y="${T}" width="${pw}" height="${ph}" fill="transparent"/>`;
+  svg.innerHTML=h;const tip=svg.parentNode.querySelector('.tip'),cr=svg.querySelector('.cr');
+  svg.querySelector('.hit').onmousemove=e=>{const r=svg.getBoundingClientRect(),sx=(e.clientX-r.left)/r.width*W;let m=Math.max(0,Math.min(NM,Math.round((sx-L)/pw*NM)));
+    cr.style.display='';const ln=cr.querySelector('line');ln.setAttribute('x1',X(m));ln.setAttribute('x2',X(m));cr.querySelectorAll('circle').forEach((c,i)=>{c.setAttribute('cx',X(m));c.setAttribute('cy',Y(SC[i][key][m]))});
+    tip.innerHTML=`<b style="font-size:14px">${hm(m)}</b><table>${SC.map((s,i)=>`<tr><td><i style="background:${COL[i]}"></i>${s.lab}</td><td><b>${s[key][m]}</b> 人</td></tr>`).join('')}</table>`;
+    place(tip,e)};
+  svg.querySelector('.hit').onmouseleave=()=>{tip.style.display='none';cr.style.display='none'};
+}
+function place(tip,e){tip.style.display='block';const wr=tip.parentNode.getBoundingClientRect();let x=e.clientX-wr.left+16;if(x+tip.offsetWidth>wr.width)x=e.clientX-wr.left-tip.offsetWidth-16;tip.style.left=x+'px';tip.style.top=Math.max(0,e.clientY-wr.top-30)+'px'}
+line('ch1','roll',60,10,'人/5分',SC.map((s,i)=>[i,s.pkAt,s.pk,'ピーク '+s.pk+'人']));
+line('ch2','un',450,50,'人',SC.map((s,i)=>[i,s.unAt,s.unPk,'ピーク '+s.unPk+'人']));
+// gantt
+let cur=1;
+seg.innerHTML=SC.map((s,i)=>`<button data-i="${i}" style="--k:${COL[i]}">${s.lab}</button>`).join('');
+seg.onclick=e=>{if(e.target.dataset.i){cur=+e.target.dataset.i;gantt()}};
+function gantt(){
+  [...seg.children].forEach((b,i)=>b.classList.toggle('on',i==cur));
+  const s=SC[cur],W=1100,L=118,R=16,T=26,RH=17,pw=W-L-R,X=m=>L+m/NM*pw;let rows=[],y=T,pl=0,h='',bands='';
+  CL.forEach(c=>{if(c.lane!=pl){if(pl)y+=7;pl=c.lane;c._first=1}else c._first=0;c._y=y;y+=RH});
+  const H=y+30,svg=document.getElementById('gantt');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  // lane bands
+  let lanes={};CL.forEach(c=>{(lanes[c.lane]=lanes[c.lane]||[]).push(c)});
+  Object.values(lanes).forEach((cs,i)=>{const y0=cs[0]._y-2,y1=cs[cs.length-1]._y+RH-1;if(i%2==0)h+=`<rect x="0" y="${y0}" width="${W}" height="${y1-y0}" fill="var(--band)"/>`;h+=`<text x="4" y="${(y0+y1)/2+4}" style="font-size:11px">L${cs[0].lane}</text>`});
+  for(let m=0;m<=NM;m+=15){const b=m%30==0;h+=`<line x1="${X(m)}" x2="${X(m)}" y1="${T-4}" y2="${H-26}" stroke="var(--grid)" ${b?'':'stroke-dasharray="2 3"'}/>`;if(b)h+=`<text x="${X(m)}" y="${T-9}" text-anchor="middle">${hm(m)}</text><text x="${X(m)}" y="${H-10}" text-anchor="middle">${hm(m)}</text>`}
+  const lx=X(s.last/60);h+=`<line x1="${lx}" x2="${lx}" y1="${T-4}" y2="${H-26}" stroke="${COL[cur]}" stroke-dasharray="4 3"/>`;
+  CL.forEach((c,k)=>{const st=s.S[c.c],a0=A.S[c.c],yy=c._y,w=Math.max(3,X(st+c.len)-X(st));
+    h+=`<text x="${L-8}" y="${yy+12}" text-anchor="end" style="fill:var(--tp);font-size:11.5px">${c.c} <tspan style="fill:var(--ts);font-size:10.5px">${c.n}</tspan></text>`;
+    if(cur)h+=`<rect x="${X(a0)}" y="${yy+2.5}" width="${Math.max(3,X(a0+c.len)-X(a0))}" height="9" rx="2" fill="none" stroke="var(--c0)" stroke-width="1"/>`;
+    if(c.ff!=null)h+=`<rect x="${X(st+c.ff/60)}" y="${yy+5.5}" width="${Math.max(2,X(st+c.tail/60)-X(st+c.ff/60))}" height="3" rx="1.5" fill="${COL[cur]}" opacity=".4"/>`;
+    h+=`<rect x="${X(st)}" y="${yy+2.5}" width="${w}" height="9" rx="2" fill="${COL[cur]}"/><rect class="gh" data-k="${k}" x="${L}" y="${yy}" width="${pw}" height="${RH}" fill="transparent"/>`});
+  svg.innerHTML=h;const tip=svg.parentNode.querySelector('.tip');
+  svg.querySelectorAll('.gh').forEach(r=>{r.onmousemove=e=>{const c=CL[+r.dataset.k],st=s.S[c.c],a0=A.S[c.c],df=st-a0;
+    tip.innerHTML=`<b style="font-size:14px">${c.c}</b>　レーン${c.lane}・${c.n}人${c.dns?'（うち欠席'+c.dns+'）':''}<table>
+    <tr><td>スタート（${['実際','①','②'][cur]}）</td><td><b>${hm(st)}〜${hm(st+c.len)}</b></td></tr>
+    ${cur?`<tr><td>実際のスタート</td><td>${hm(a0)}〜${hm(a0+c.len)}</td></tr><tr><td>差</td><td>${df==0?'変更なし':(df>0?df+'分 遅く':-df+'分 早く')}</td></tr>`:''}
+    <tr><td>最初の帰還〜最後の帰還</td><td>${c.ff==null?'–':hm(st+c.ff/60)+'〜'+hms(st*60+c.tail)}</td></tr>
+    <tr><td>所要 中央値／最長</td><td>${dur(c.med)}／${dur(c.mx)}</td></tr></table>`;place(tip,e)};r.onmouseleave=()=>tip.style.display='none'});
+}
+gantt();
+// table
+let t='<tr><th rowspan="2">レーン</th><th rowspan="2">クラス</th><th rowspan="2">人数</th><th rowspan="2">所要<br>中央値</th><th rowspan="2">所要<br>最長</th><th colspan="3">スタート時間帯</th><th colspan="3">クラス最後の帰還</th></tr><tr><th>実際</th><th>①</th><th>②</th><th>実際</th><th>①</th><th>②</th></tr>';
+CL.forEach(c=>{const ss=SC.map(s=>s.S[c.c]);
+ t+=`<tr${c._first?' class="ls"':''}><td>${c.lane}</td><td class="l"><b>${c.c}</b></td><td>${c.n}</td><td>${dur(c.med)}</td><td>${dur(c.mx)}</td>`+ss.map((s,i)=>`<td class="${i&&s!=ss[0]?'e':i?'w':''}">${hm(s)}〜${hm(s+c.len)}</td>`).join('')+ss.map(s=>`<td>${c.tail==null?'–':hms(s*60+c.tail)}</td>`).join('')+'</tr>'});
+tbl.innerHTML=t;
+</script></body></html>
