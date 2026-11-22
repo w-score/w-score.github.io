@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GalaGalaPon!（スタート順抽選・調整ツール）</title>
+<!--
+  スタートリストの同一クラス内で、同じ所属の競技者が続けてスタートしている箇所を見つけ、
+  スタート時刻を入れ替えて解消するツール。処理はすべてこのページ内（ブラウザ）で行い、
+  読み込んだデータはどこにも送信しない。
+  根拠: 日本オリエンテーリング競技規則および関連規則類の運用に関するガイドライン 9.2 スタート順
+  版: 1.0 (2026-11-21)  辞書なしモード（入力ファイルの所属欄だけで判定）
+-->
+<!-- Google Analytics（w-score.github.io と同じプロパティ）。送るのはページビューと、実行イベントの大会名・件数だけ -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-CLNR9WGSGN"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CLNR9WGSGN');</script>
+<style>
+:root{--fg:#111;--bg:#fff;--line:#999;--muted:#666;--panel:#e4f3c4;--lime-deep:#8cc63f;--accent:#2e7d32;--green-dark:#1b5e20;--red:#c00;--blue:#1a5fb4}
+/* 配色は w-score.github.io の site.css に合わせたグリーン基調（lime #e4f3c4 / lime-deep #8cc63f / green #2e7d32 / green-dark #1b5e20） */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:"Meiryo","メイリオ","Hiragino Sans","Yu Gothic","Noto Sans CJK JP",system-ui,sans-serif;font-size:13px;line-height:1.4}
+body{padding:12px 16px}
+h1{font-size:22px;margin:0;letter-spacing:.3px;color:var(--green-dark)}
+.brand{display:flex;align-items:center;gap:10px;margin:0 0 6px;background:var(--panel);border-bottom:5px solid var(--lime-deep);padding:8px 14px;margin:-12px -16px 8px}
+.brand .tagline{font-size:12px;color:var(--muted);margin-top:-2px}
+.verify{margin:6px 0 10px}
+.verify table td,.verify table th{font-size:12px;padding:2px 8px}
+.verify .ok{color:var(--blue);font-weight:bold}
+.verify th{background:#eef5e1}
+.verify .ng{color:var(--red);font-weight:bold}
+.sub{color:var(--muted);font-size:12px;margin-bottom:10px}
+.panel{background:var(--panel);border:1px solid #cfe3a8;border-radius:6px;padding:8px 10px;margin-bottom:8px}
+.row{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.row+.row{margin-top:6px}
+label{white-space:nowrap}
+input[type=text],input[type=number],select,textarea{font:inherit;padding:3px 5px;border:1px solid #bbb;border-radius:4px;background:#fff}
+input[type=number]{width:64px}
+textarea{width:100%;min-height:54px;font-size:12px}
+button{font:inherit;padding:4px 10px;border:1px solid #888;border-radius:4px;background:#fff;cursor:pointer}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+button:hover:not(:disabled){filter:brightness(.95)}
+#drop{border:2px dashed var(--lime-deep);border-radius:8px;padding:16px;text-align:center;background:#fff;cursor:pointer}
+#drop.over{background:#f3fae6;border-color:var(--accent)}
+details summary{cursor:pointer;font-weight:bold;color:var(--green-dark)}
+.status{font-size:12px;color:var(--muted);margin:4px 0}
+.stat{font-weight:bold}
+table{border-collapse:collapse;width:auto;max-width:100%}
+th,td{border:1px solid var(--line);padding:3px 6px;text-align:left;vertical-align:middle;white-space:nowrap}
+thead th{background:#eef5e1;position:sticky;top:0;z-index:2}
+tr.gtitle td{font-weight:bold;font-size:14px;padding:5px 6px;border-top:2px solid #555}
+tr.dup td{color:var(--red);font-weight:bold}
+td.club .why{font-weight:normal;font-size:11px}
+td.club .dict{color:var(--green-dark);font-weight:bold}
+tr.moved td.time,tr.moved td.seq{color:var(--blue)}
+tr.moved td.time .old{font-weight:normal;font-size:11px}
+td.num{text-align:right}
+td.note{white-space:normal;word-break:break-all;font-size:11px;color:#444;min-width:16em}
+table.hasnote{width:100%}
+.hist td,.hist th{font-size:12px;padding:2px 8px}
+.hist tr.cur td{background:#f3fae6;font-weight:bold}
+.small{font-size:11px;color:var(--muted)}
+.map{display:grid;grid-template-columns:max-content max-content;gap:4px 10px;align-items:center}
+.noprint{}
+@media print{.noprint{display:none !important} body{padding:0} thead th{position:static} tr.dup td{color:var(--red) !important} tr.moved td.time{color:var(--blue) !important} td,th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="brand">
+  <svg class="logo" viewBox="0 0 64 64" width="52" height="52" aria-hidden="true">
+    <!-- ガラガラ（抽選器）：八角形の胴体・取っ手・飛び出す玉 -->
+    <polygon points="20,8 38,8 50,20 50,38 38,50 20,50 8,38 8,20" fill="#2e7d32" stroke="#1b5e20" stroke-width="2.5" stroke-linejoin="round"/>
+    <polygon points="24,15 34,15 43,24 43,34 34,43 24,43 15,34 15,24" fill="#e4f3c4" stroke="#1b5e20" stroke-width="1.5"/>
+    <circle cx="29" cy="29" r="3.2" fill="#1b5e20"/>
+    <path d="M29 29 L40 20" stroke="#1b5e20" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="41" cy="19" r="4" fill="#8cc63f" stroke="#1b5e20" stroke-width="1.5"/>
+    <rect x="6" y="50" width="52" height="5" rx="2" fill="#1b5e20"/>
+    <circle cx="56" cy="46" r="5.5" fill="#f6b44a" stroke="#1b5e20" stroke-width="1.5"/>
+    <circle cx="61" cy="56" r="3.5" fill="#c00" stroke="#1b5e20" stroke-width="1.2"/>
+  </svg>
+  <div><h1>GalaGalaPon!</h1><div class="tagline">スタート順抽選・調整ツール</div></div>
+</div>
+<div class="sub">・同一クラス内で同じ所属の競技者が続けてスタートしている箇所を見つけ、スタート時刻を入れ替えて解消します。所属は空白除去・全角化・末尾の数字／n期／n年の削除・スラッシュ分割・大文字小文字の同一視をしたうえで比較します。<br>
+・処理はこのページ内だけで行い、データはどこにも送信しません。<br>
+・「日本オリエンテーリング競技規則および関連規則類の運用に関するガイドライン」の9.2スタート順の項「同一クラブ・チームの競技者が連続した場合には、前後の競技者と入れ替えるなどして連続しないようにすることが望ましい」に準拠しています。</div>
+
+<div class="panel noprint">
+  <div id="drop">スタートリストのファイル（HTML または CSV）をここにドロップ、またはクリックして選択<br>
+    <span class="small">HTML：DATA を埋め込んだスタートリスト形式　CSV：クラス・氏名・所属・スタート時刻の列があるもの、JOY のエントリーリスト（NNNN_entrylist*.csv）、または Mulka2 取り込み用スタートリスト（Startlist.csv、見出しで自動判定）。UTF-8／Shift_JIS／UTF-16（Excel の Unicode テキスト）</span>
+    <input type="file" id="file" accept=".html,.htm,.csv,.txt" style="display:none"></div>
+  <div class="row" style="margin-top:8px"><span id="fileinfo" class="status">ファイル未読込</span></div>
+  <div id="csvmap" class="row" style="display:none">
+    <b>CSV の列の対応：</b>
+    <label>クラス <select id="m_cls"></select></label>
+    <label>氏名 <select id="m_name"></select></label>
+    <label>所属 <select id="m_club"></select></label>
+    <label>スタート時刻 <select id="m_time"></select></label>
+    <label>No <select id="m_no"></select></label>
+    <label>レーン <select id="m_course"></select></label>
+    <button onclick="applyMap()">この対応で読み込む</button>
+  </div>
+</div>
+
+<div class="panel noprint">
+  <div class="row">
+    <label>大会名：<input type="text" id="evname" style="width:26em" placeholder="（任意）"></label>
+    <label title="同じ seed なら何度やっても同じ結果になります。別の並びがほしいときは番号を変えてください">seed（並べ替えに使う乱数の種、ここでは選択式）：<input type="number" id="seed" value="1" min="0"></label>
+    <label title="オンにすると、クラス内の全員を無作為に並べ替えてから同一所属の調整をします。オフなら入力の並びを出発点に最小限の入れ替えだけ行います"><input type="checkbox" id="lottery" checked> クラス内のスタート順を抽選する</label>
+    <button class="primary" id="btnCheck" onclick="runCheck()" disabled>チェック</button>
+    <button class="primary" id="btnReorder" onclick="runReorder()" disabled>並べ替え</button>
+    <button id="btnVerify" onclick="runVerify()" disabled>検証</button>
+    <button id="btnNext" onclick="nextSeed()" disabled>別案（次の seed）</button>
+    <button id="btnPrev" onclick="prevSeed()" disabled>前の案に戻る</button>
+    <button id="btnReset" onclick="resetOrder()" disabled>元の並びに戻す</button>
+  </div>
+  <div class="row">
+    <button id="btnDlHtml" onclick="downloadHtml()" disabled>結果 HTML をダウンロード</button>
+    <button id="btnDlCsv" onclick="downloadChanges()" disabled>変更一覧 CSV をダウンロード</button>
+    <button id="btnDlList" onclick="downloadList()" disabled>並べ替え後リスト CSV をダウンロード（JOY・Mulka2 形式入力時は Startlist.csv）</button>
+    <button onclick="window.print()">印刷</button>
+  </div>
+  <details style="margin-top:6px">
+    <summary>判定の設定（除外語・同一視する所属）</summary>
+    <div class="row" style="margin-top:4px;align-items:flex-start">
+      <div style="flex:1;min-width:280px"><div>所属として扱わない語（1行1語）</div><textarea id="ignore"></textarea></div>
+      <div style="flex:1;min-width:280px"><div>同一視する所属（1行に「正表記=別表記=…」。先頭が正表記。例 ES関東C=ES関東クラブ）
+        <button type="button" onclick="resetEquiv()" style="font-size:11px;padding:1px 6px;margin-left:6px">既定に戻す</button>
+        <button type="button" onclick="sendEquivDiff()" style="font-size:11px;padding:1px 6px;margin-left:4px" title="既定との差分（足した行・消した行）と大会名を、作者のGoogleフォームに入れた状態で開きます。送信するかはそこで決められます">この同一視設定を作者に送る</button>
+        <label class="small" style="margin-left:6px"><input type="checkbox" id="equivKeep"> 編集内容をこの端末に記憶する</label></div><textarea id="equiv" style="min-height:120px"></textarea></div>
+    </div>
+    <div class="row" style="margin-top:6px"><label><input type="checkbox" id="useDict" checked> 所属辞書で表記ゆれを名寄せする（出力ファイルの所属を正表記に置換） <span class="small" id="dictInfo"></span></label></div>
+    <div class="small" style="margin-top:4px">所属は、空白除去・全角化・末尾の数字／n期／n年の削除・スラッシュ分割・大文字小文字の同一視をしたうえで比較します。辞書は実績データから作った「同じ所属の別表記」の表（多数派の表記に統一）で、該当した所属は画面に緑の「▶ 正表記」を添え、ダウンロードするファイルでは所属を正表記に置換します（画面の表示は元の表記のまま。末尾の期・学年などの数字は判定では無視し、出力では残します）。</div>
+  </details>
+</div>
+
+<div class="status" id="status"></div>
+<div class="verify noprint" id="verify" style="display:none"></div>
+<div class="status" id="unify" style="margin:10px 0"></div>
+<div class="row noprint" id="histwrap" style="display:none;align-items:flex-start;gap:20px">
+  <div><div class="small">seed ごとの結果（クリックで表示）</div><table class="hist" id="hist"></table></div>
+  <div style="flex:1"><div class="small">残った連続ペア</div><div id="pairs" class="small"></div></div>
+</div>
+
+<table id="tbl" style="margin-top:14px"><thead><tr id="hdr"></tr></thead><tbody id="body"></tbody></table>
+
+<script>
+// ============================================================
+// 整形ルール（extract_names.py / mark_same_club.py の移植）
+// ============================================================
+const D = "[0-9０-９]+";
+const PREFS = "北海道 青森 岩手 宮城 秋田 山形 福島 茨城 栃木 群馬 埼玉 千葉 東京 神奈川 新潟 富山 石川 福井 山梨 長野 岐阜 静岡 愛知 三重 滋賀 京都 大阪 兵庫 奈良 和歌山 鳥取 島根 岡山 広島 山口 徳島 香川 愛媛 高知 福岡 佐賀 長崎 熊本 大分 宮崎 鹿児島 沖縄".split(" ");
+const PREF = "(?:" + PREFS.join("|") + ")[都道府県]?";
+const RE_SKIP = [new RegExp("^"+D), new RegExp("^"+PREF+"[-－]"+D+"走$"), new RegExp("^"+PREF+D+"$"), /^[-－ー]+$/];
+const RE_STRIP = [new RegExp(D+"期$"), new RegExp(D+"年$"), new RegExp("[\\s\\u3000]*"+D+"$")];
+const RE_BAD = /[●？?]/, RE_PAREN = /[()（）]/, RE_SPACE = /[\s　]+/g;
+const DEFAULT_IGNORE = "オフィシャル\nOFFICIAL\nコーチ\n運営\n試走\n前走\n設置\n設置試走\n別日・試走\n強化選手\n招待選手\n自然\nコラボ\nA\nB\nC\n日曜ロングランナー\n仮入部\n個人\nなし\n一般\n無所属\nM\nW";
+
+function toZenkaku(s){
+  s = String(s ?? "").replace(/[｡-ﾟ]+/g, m => m.normalize("NFKC"));
+  let out = "";
+  for (const ch of s){
+    const c = ch.codePointAt(0);
+    if (c === 0x20) out += "　";
+    else if (c >= 0x21 && c <= 0x7e) out += String.fromCodePoint(c + 0xFEE0);
+    else out += ch;
+  }
+  return out;
+}
+function cleanClub(club){
+  club = club.trim();
+  if (!club || RE_SKIP.some(r => r.test(club))) return null;
+  for (const r of RE_STRIP) club = club.replace(r, "").trim();
+  if (!club || RE_BAD.test(club) || RE_PAREN.test(club)) return null;
+  return club;
+}
+function normName(s){ return toZenkaku(String(s ?? "").replace(RE_SPACE, "")); }
+let IGNORE = new Set(), EQUIV = new Map(), EQUIV_DISP = new Map();
+// ---------- 所属辞書（表記ゆれの名寄せ）----------
+// build_club_dict.py → apply_club_aliases.py で作った club_dict.json を embed_club_dict.py がここに埋め込む。
+// aliases: 整形後キー → 正表記のキー、display: キー → 正表記（実データで最も多い表記）
+/*CLUB_DICT_BEGIN*/
+const CLUB_DICT = {"since":"2025-04-01","aliases":{"お茶の水女子":"お茶の水女子大学","お茶の水大学":"お茶の水女子大学","サンスーシ":"サン・スーシ","つるまい":"つるまいＯＬＣ","ボーイスカウト福山第２団　ボーイ隊":"ボーイスカウト福山第２団","横浜ＯＬＣ":"横浜ＯＬクラブ","科学大ＯＬＴ":"東京科学大ＯＬＴ","ＯＬＴ":"東京科学大ＯＬＴ","京京立ＯＬＣ":"京京立","京葉ＯＬＣ":"京葉ＯＬクラブ","京葉オリエンテーリングクラブ":"京葉ＯＬクラブ","埼玉県立浦和高校":"埼玉県立浦和高等学校","浦高ＯＬＣ":"埼玉県立浦和高等学校","千葉大":"千葉大学","筑波大学オリエンテーリング部":"筑波大学","東京科学大学ＯＬＴ":"東京科学大ＯＬＴ","東京大学オリエンテーリングクラブ":"東大ＯＬＫ","東北大":"東北大学","入間ＯＬＣ":"入間市ＯＬＣ","入間市ＯＬＫ":"入間市ＯＬＣ","入間市オリエンテーリングクラブ":"入間市ＯＬＣ","武相":"武相高等学校","武相高校":"武相高等学校","法政":"法政大学","麻布ＯＬＫ":"麻布学園ＯＬＫ","ＥＳ関東クラブ":"ＥＳ関東Ｃ"},"display":{"入間市ＯＬＣ":"入間市OLC","筑波大学":"筑波大学","東大ＯＬＫ":"東大OLK","ＥＳ関東Ｃ":"ES関東C","ＯＬＰ兵庫":"OLP兵庫","東北大ＯＬＣ":"東北大OLC","京葉ＯＬクラブ":"京葉OLクラブ","ＫＯＬＣ":"KOLC","早大ＯＣ":"早大OC","名椙ＯＬＣ":"名椙OLC","千葉大ＯＬＣ":"千葉大OLC","京大ＯＬＣ":"京大OLC","東北大学":"東北大学","静岡ＯＬＣ":"静岡OLC","北大ＯＬＣ":"北大OLC","埼玉県立浦和高等学校":"埼玉県立浦和高等学校","ＯＬＣルーパー":"OLCルーパー","大阪ＯＬＣ":"大阪OLC","練馬ＯＬＣ":"練馬OLC","青葉会":"青葉会","横浜ＯＬクラブ":"横浜OLクラブ","ＪＤＯＡ":"JDOA","京都ＯＬＣ":"京都OLC","千葉大学":"千葉大学","茨城大学":"茨城大学","ＫＯＬＡ":"KOLA","杏友会":"杏友会","つばめ会":"つばめ会","トータス":"トータス","桐嶺会":"桐嶺会","東京大学":"東京大学","三河ＯＬＣ":"三河OLC","朱雀ＯＫ":"朱雀OK","鳩の会":"鳩の会","つるまいＯＬＣ":"つるまいOLC","北海道大学":"北海道大学","渋谷で走る会":"渋谷で走る会","新潟大学":"新潟大学","ときわ走林会":"ときわ走林会","名古屋大学":"名古屋大学","横浜国立大学":"横浜国立大学","サン・スーシ":"サン・スーシ","京都大学":"京都大学","麻布学園ＯＬＫ":"麻布学園OLK","桐朋ＩＫ":"桐朋IK","長野県協会":"長野県協会","札幌農学校":"札幌農学校","みちの会":"みちの会","早稲田大学":"早稲田大学","丘の上":"丘の上","羅針盤":"羅針盤","多摩ＯＬ":"多摩OL","上尾ＯＬＣ":"上尾OLC","越王会":"越王会","ＧＲＯＫ":"GROK","岩手大学ＯＬＣ":"岩手大学OLC","立命ＯＬＣ":"立命OLC","川越ＯＬＣ":"川越OLC","ＯＬＣふるはうす":"OLCふるはうす","東京科学大ＯＬＴ":"東京科学大OLT","奈良女ＯＬＣ":"奈良女OLC","東京理科大学":"東京理科大学","奈良市":"奈良市","神大ＯＬＫ":"神大OLK","広大ＯＬＣ":"広大OLC","方向音痴会":"方向音痴会","京女ＯＬＣ":"京女OLC","ＪＡＰＡＮ":"Japan","東京ＯＬクラブ":"東京OLクラブ","千葉ＯＬＫ":"千葉OLK","東京科学大学":"東京科学大学","ＨＯＮＧ　ＫＯＮＧ　ＣＨＩＮＡ":"Hong Kong China","ＯＬＣレオ":"OLCレオ","阪大ＯＬＣ":"阪大OLC","ＣＬＵＢ阿闍梨":"Club阿闍梨","神戸大学":"神戸大学","長岡ＯＬＣ":"長岡OLC","札幌ＯＬＣ":"札幌OLC","大阪大学":"大阪大学","奈良女子大学":"奈良女子大学","一橋大学":"一橋大学","ＣＣＣ":"CCC","アークスキーチーム":"アークスキーチーム","慶應義塾大学":"慶應義塾大学","岩手大学":"岩手大学","松塾":"松塾","ＨＡＮＡ　ＯＲＩＥＮＴＥＥＲＩＮＧ":"Hana Orienteering","桐朋中学校":"桐朋中学校","立命館大学":"立命館大学","ＫＲＯＫ":"KROK","日本女子大学":"日本女子大学","横浜市立大学":"横浜市立大学","東海中学校":"東海中学校","岐阜ＯＬＣ":"岐阜OLC","静岡大学":"静岡大学","沖縄県":"沖縄県","日本大学":"日本大学","ＣＨＩＮＡ":"China","京京立":"京京立","福島県協会":"福島県協会","桐朋高等学校":"桐朋高等学校","東京農工大学":"東京農工大学","ＯＣ":"OC","名椙":"名椙","ワンダラーズ":"ワンダラーズ","高崎ＯＬＣ":"高崎OLC","中央大学附属高等学校ＷＩＬＤＬＩＦＥ":"中央大学附属高等学校WILDLIFE","ＯＬＣ東海":"OLC東海","広島大学":"広島大学","上尾ＯＬクラブ":"上尾OLクラブ","宮城学院女子大学":"宮城学院女子大学","横浜ＯＬＣ":"横浜OLC","松本オリエンテーリングクラブ":"松本オリエンテーリングクラブ","京都女子大学":"京都女子大学","台湾魔神":"台湾魔神","麻布中学校":"麻布中学校","ＵＬＵＳ　ＲＥＩＳＥＷＥＬＴ":"ULUS REISEWELT","ゆるふわＯＬＣ":"ゆるふわOLC","法政大学":"法政大学","ＲＯＬＡ":"ROLA","早大ＯＣ寿会":"早大OC寿会","東京農業大学第三高等学校":"東京農業大学第三高等学校","紅萠会":"紅萠会","阪神奈":"阪神奈","お茶の水女子大学":"お茶の水女子大学","金沢大学":"金沢大学","京京立ＯＬＣ":"京京立OLC","武相高校":"武相高校","筑波大学大学院":"筑波大学大学院","ＯＬＫ":"OLK","ＭＯＸＩＮＡ　ＯＫ":"Moxina OK","広島ＯＬＣ":"広島OLC","みゅーしぐ":"みゅーしぐ","ＴＥＡＭ白樺":"Team白樺","ＣＬほわほわ":"CLほわほわ","名古屋文理大学":"名古屋文理大学","岡崎ＯＬ協会":"岡崎OL協会","ＴＯＲＣＨ":"TORCH","麻布ＯＬＫ":"麻布OLK","筑波大学院":"筑波大学院","ＨＫＩＯＦ":"HKIOF","ＨＫＯＸＣＣ":"HKOXCC","ＫＬＵＢ　ＯＢ　ＡＴＵ　ＫＯＳＩＣＥ":"Klub OB ATU Kosice","東海高等学校":"東海高等学校","いづもＯＬＣ":"いづもOLC","ＴＥＡＭ　３６０　ＳＴＯＰＮＩ　ＷＡＲＳＺＡＷＡ":"Team 360 stopni Warszawa","静大ＯＬＣ":"静大OLC","金大ＯＬＣ":"金大OLC","科学大ＯＬＴ":"科学大OLT","三河":"三河","ＨＥＬＳＩＮＧＩＮ　ＳＵＵＮＮＩＳＴＡＪＡＴ":"Helsingin Suunnistajat","ＪＰＮ":"JPN","浜松ＯＬＣ":"浜松OLC","東京科学大学ＯＬＴ":"東京科学大学OLT","ＥＳ関東クラブ":"ES関東クラブ","ＷＫＳ　ＷＡＷＥＬ":"WKS Wawel","わりかし小径車の会":"わりかし小径車の会","外濠之会":"外濠之会","中央大学附属中学校ＷＩＬＤＬＩＦＥ":"中央大学附属中学校WILDLIFE","ＣＨＩＮＥＳＥ　ＴＡＩＰＥＩ":"Chinese Taipei","京葉オリエンテーリングクラブ":"京葉オリエンテーリングクラブ","ＮＯＲ":"NOR","設楽町":"設楽町","大阪公立大学":"大阪公立大学","ＳＷＥ":"SWE","麻布高等学校":"麻布高等学校","椙山女学園大学":"椙山女学園大学","ＦＩＮ":"FIN","浦高ぎんなん会":"浦高ぎんなん会","川口ＯＬＣ":"川口OLC","レオ":"レオ","福島大学":"福島大学","デジタル庁":"デジタル庁","ＵＮＴＳ　ＷＡＲＳＺＡＷＡ":"UNTS Warszawa","ＩＦＫ　ＭＯＲＡ　ＯＫ":"IFK Mora OK","練馬":"練馬","六国会":"六国会","ＯＫ　ＴＯＮ":"OK TON","博多ＯＬＣ":"博多OLC","晴れの国岡山":"晴れの国岡山","中央大学附属高等学校":"中央大学附属高等学校","ＲＳＫ　ＪＯＨＶＩＫＡＳ":"RSK Johvikas","ＯＫ　ＬＯＫＯＭＯＴＩＶＡ　ＰＡＲＤＵＢＩＣＥ":"OK Lokomotiva Pardubice","アークコミュニケーションズ":"アークコミュニケーションズ","ＳＯＰＨＩＡ":"Sophia","金沢市":"金沢市","武相高等学校":"武相高等学校","大阪":"大阪","安土ＵＫ":"安土UK","ＣＺＥ":"CZE","ＵＳＡ":"USA","横浜ＯＬ":"横浜OL","所沢ＯＬＣ":"所沢OLC","徳島県ＯＬ協会":"徳島県OL協会","ＯＫ　ＳＯＤＥＲＴＯＲＮ":"OK Sodertorn","ＢＡＬＬＥＲＵＰ　ＯＫ":"Ballerup OK","じゃじゃじゃＯＣ":"じゃじゃじゃOC","ＴＲＥＫＮＡＯ":"TREKNAO","ＳＵＩ":"SUI","阪神奈ＯＬＣ":"阪神奈OLC","ＫＳ　ＨＡＤＥＳ　ＰＯＺＮＡＮ":"KS Hades Poznan","ＯＫ　ＳＰＡＲＴＡ　ＰＲＡＨＡ":"OK Sparta Praha","ＳＷＩＳＳ　Ｏ　ＴＯＵＲＳ":"Swiss O Tours","ＭＯＮＡ　ＯＫ":"Mona OK","ＯＫ　ＩＬＶＥＳ":"OK Ilves","北杜ＯＬＣ":"北杜OLC","ＯＣ⊿下野":"OC⊿下野","武相高":"武相高","大府市":"大府市","春日部ＯＬＣ":"春日部OLC","ボーイスカウト福山第２団":"ボーイスカウト福山第２団","白山市":"白山市","七尾市":"七尾市","浦高ＯＬＣ":"浦高OLC","ボーイスカウト福山第２団　ボーイ隊":"ボーイスカウト福山第２団　ボーイ隊","ペアラレーシング":"ペアラレーシング","ねぎまＯＬＣ":"ねぎまOLC","実践女子大学":"実践女子大学","ＨＡＲＪＵ　ＯＫ":"Harju OK","ＯＰＣ":"OPC","ゾウガメＯＬＫ":"ゾウガメOLK","岡山県ＯＬ協会":"岡山県OL協会","ＩＳＯＣ":"ISOC","ちくせいＯＬ苦楽部":"ちくせいＯＬ苦楽部","東海市":"東海市","ＵＫＲ":"UKR","ＬＴＵ":"LTU","ＳＡＬＤＵＳ　ＯＫ":"Saldus OK","ＦＲＥＩＤＩＧ":"Freidig","東京農業大学第三高等学校附属中学校":"東京農業大学第三高等学校附属中学校","ソニーＯＬＣ":"ソニーOLC","みやこＯＬＣ":"みやこOLC","ＥＳＴ":"EST","いーえすかんとー":"いーえすかんとー","埼玉県立浦和高校":"埼玉県立浦和高校","ＫＯＢ　ＫＹＳＡＫ":"KOB Kysak","ＫＡＮＧＡＳＡＬＡ　ＳＫ":"Kangasala SK","ＥＳ関東":"ES関東","神戸市":"神戸市","ＳＫＯＢ　ＦＲＹＤＥＫ　ＭＩＳＴＥＫ":"SKOB Frydek Mistek","ＦＡＮＡ　ＩＬ":"Fana IL","ＴＹＲＶＩＮＧ　ＩＬ":"Tyrving IL","法政大ＯＬＣＯＢ上尾ＯＬＣ":"法政大OLCOB上尾OLC","京葉ＯＬＣ":"京葉OLC","相模女子大学":"相模女子大学","ＣＴＯＡ":"CTOA","國防大學":"國防大學","ＯＫ　ＪＩＳＫＲＡ　ＮＯＶＹ　ＢＯＲ":"OK JISKRA NOVY BOR","ＫＵ　ＡＺＳ　ＷＡＴ　ＷＡＲＳＺＡＷＡ":"KU AZS WAT Warszawa","ＯＫ　ＫＡＰＥ":"OK Kape","まめ":"まめ","ＴＰＥ":"TPE","東京":"東京","ＴＵＲＵＮ　ＭＥＴＳＡＮＫＡＶＩＪＡＴ":"Turun Metsankavijat","ＳＫ　ＰＲＯＳＴＥＪＯＶ":"SK Prostejov","ＲＵＤＡＭＩＮＡ　ＯＫ":"Rudamina OK","ＨＯＮＧ　ＫＯＮＧ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"Hong Kong Orienteering Club","ＯＫ　ＬＩＮＮＥ":"OK Linne","信陵会":"信陵会","静陵会":"静陵会","かほく市":"かほく市","ＨＵＮ":"HUN","ＮＯＲＷＡＹ":"Norway","ＳＡＬＧＯＴＡＲＪＡＮＩ　ＤＯＲＮＹＡＹ　ＳＥ":"Salgotarjani Dornyay SE","ＲＡＳＴＩ　ＪＹＲＹ":"Rasti Jyry","つくばＣＯＣＣＯ":"つくばCocco","ＹＧ":"YG","津田塾大学":"津田塾大学","小松市":"小松市","きょうとおーえるしー":"きょうとおーえるしー","ＬＥＡＲＮＪＯＹ　ＣＨＩＮＡ":"Learnjoy China","ＣＨＮ":"CHN","ＳＷＩＴＺＥＲＬＡＮＤ":"Switzerland","ＨＩＲＶＥＮＳＡＬＯＮ　ＨＥＩＴＴＯ":"Hirvensalon Heitto","多摩オリエンテーリングクラブ":"多摩オリエンテーリングクラブ","ＨＯＮＧ　ＫＯＮＧ":"Hong Kong","ＨＫＯＣ":"HKOC","田辺市":"田辺市","ＦＩＮＬＡＮＤ":"Finland","ＵＫＳ　ＡＺＹＭＵＴ　ＰＡＢＩＡＮＩＣＥ":"UKS Azymut Pabianice","ＷＫＳ　ＳＬＡＳＫ　ＷＲＯＣＬＡＷ":"WKS Slask Wroclaw","ＫＵ　ＡＺＳ　ＵＭＣＳ　ＬＵＢＬＩＮ":"KU AZS UMCS Lublin","ＨＫＳ　ＡＺＹＭＵＴ　ＭＯＣＨＹ":"HKS Azymut Mochy","ＹＥＮＩＭＡＨＡＬＬＥ　ＴＥＫＮＩＫ　ＳＣ":"Yenimahalle Teknik SC","ＲＡＪＡＭＡＥＮ　ＲＹＫＭＥＮＴＴＩ":"Rajamaen Rykmentti","ＨＥＧＹＩＳＰＯＲＴ　ＳＺＥＮＴＥＮＤＲＥ　ＥＧＹＥＳＵＬＥ":"Hegyisport Szentendre Egyesule","ＯＣ　ＭＡＳＴＥＲ":"OC MASTER","ＤＥＶＹＮＩ　ＬＡＢＩＲＩＮＴＡＩ":"Devyni Labirintai","いずもＯＬＣ":"いずもOLC","新大ＯＣ":"新大OC","能美市":"能美市","ＲＥＰＵＢＬＩＣ　ＯＦ　ＫＯＲＥＡ":"Republic of Korea","ＡＳＫＥＲ　ＳＫＩＫＬＵＢＢ":"Asker Skiklubb","ＤＥＬＡＷＡＲＥ　ＶＡＬＬＥＹ　ＯＲＩＥＮＴＥＥＲＩＮＧ　Ａ":"Delaware Valley Orienteering A","ＶＳＫ　ＭＥＮＤＥＬＵ　ＢＲＮＯ":"VSK Mendelu Brno","ＣＳ　ＯＲＩＥＮＴＥＲ　ＴＧ　ＭＵＲＥＳ":"CS Orienter Tg Mures","ＩＬＶＥＳ　ＯＫ":"Ilves OK","ＳＲＯＣ":"SROC","ＬＵＮＤＳ　ＯＫ":"Lunds OK","東京都稲城市":"東京都稲城市","東北大学オリエンテーリング部":"東北大学オリエンテーリング部","筑波新歓":"筑波新歓","愛知ＯＬＣ":"愛知OLC","筑波大学オリエンテーリング部":"筑波大学オリエンテーリング部","ＢＲＡ":"BRA","ＰＯＲＳＧＲＵＮＮ　ＯＬ":"Porsgrunn OL","ＫＯＫＫＯＬＡＮ　ＳＵＵＮＮＩＳＴＡＪＡＴ":"Kokkolan Suunnistajat","ＯＫ　ＳＫＯＧＳＨＪＯＲＴＡＲＮＡ":"OK Skogshjortarna","茨大ＯＬＤ":"茨大OLD","サンスーシ":"サンスーシ","神大ＯＬＣ":"神大OLC","ぬいぬい一門":"ぬいぬい一門","桐朋中学校・高等学校":"桐朋中学校・高等学校","ＪＯＫＡ":"JOKA","ＳＥＶＥＲ":"Sever","ＦＲＳＯ　ＢＥＬＧＩＵＭ":"FRSO Belgium","ＯＫ　ＬＥＶＵＯ":"OK Levuo","ＫＯＢ　ＴＲＥＴＲＡ　ＰＲＡＨＡ":"KOB Tretra Praha","ＯＫ　ＣＨＲＡＳＴＡＶＡ":"OK Chrastava","ＶＡＳＢＹ　ＯＫ":"Vasby OK","ＫＯＯＰＥＲＡＡＴＯＲ":"Kooperaator","おしゃがみ党":"おしゃがみ党","福岡県協会":"福岡県協会","ＫＡＴＡＮＡ　ＡＤＶＥＮＴＵＲＥ":"KATANA Adventure","倉敷市":"倉敷市","千葉大":"千葉大","ナビたび":"ナビたび","ＴＵＲＵＮ　ＳＵＵＮＮＩＳＴＡＪＡＴ":"Turun Suunnistajat","ＳＷＥＤＥＮ":"Sweden","ＡＺＹＭＵＴ　４５　ＧＤＹＮＩＡ":"Azymut 45 Gdynia","ＢＯＫ":"BOK","ＭＥＤＥＩＮＡ　ＯＫ":"Medeina OK","ＯＫ　ＫＯＰＡ":"OK Kopa","ＯＫ　ＯＲＩＥＮＳ":"OK Oriens","ＯＫ　ＶＯＲＵ":"OK Voru","ＥＳＰＯＯＮ　ＳＵＵＮＴＡ":"Espoon Suunta","ＫＯＮＧＳＢＥＲＧ　ＯＬ":"Kongsberg OL","ＳＬＡＶＩＡ　ＬＩＢＥＲＥＣ　ＯＲＩＥＮＴＥＥＲＩＮＧ":"Slavia Liberec orienteering","ＯＴＫ":"OTK","ＡＰＥＸ　ＡＣＴＩＯＮ":"Apex Action","早稲田大学大学院":"早稲田大学大学院","蹴上ＯＬＣ":"蹴上OLC","ＴＵＬＬＩＮＧＥ　ＳＫ":"Tullinge SK","ＨＪＡＲＮＡＲＰＳ　ＯＬ":"Hjarnarps OL","ＨＹＶＩＮＫＡＡＮ　ＲＡＳＴＩ":"Hyvinkaan Rasti","ＭＩＤＩＺ":"MIDIZ","入間ＯＬＣ":"入間OLC","新潟県協会":"新潟県協会","浜の下":"浜の下","秋田大学":"秋田大学","期待の新人":"期待の新人","花茶":"花茶","ＯＫ　ＤＡＩＮＡＶＡ":"OK Dainava","ＵＫＳ　ＯＲＩＥＮＴＵＳ　ＬＯＤＺ":"UKS Orientus Lodz","ＪＡＲＬＡ　ＯＲＩＥＮＴＥＲＩＮＧ":"Jarla Orientering","ＬＩＬＬＯＭＡＲＫＡ　ＯＬ":"Lillomarka OL","ＳＯＵＴＨ　ＬＯＮＤＯＮ　ＯＲＩＥＮＴＥＥＲＳ":"South London Orienteers","ＳＡＮＤＥＦＪＯＲＤ　ＯＫ":"Sandefjord OK","ＣＸ８０　ＰＯＬＳＫＡ":"CX80 POLSKA","ＳＷＡＮＳＥＡ　ＢＡＹ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"Swansea Bay Orienteering Club","ＳＫ　ＡＡＳＡ":"SK Aasa","ＲＡＫＶＥＲＥ　ＯＫ":"Rakvere OK","ＨＡＭＡＲ　ＯＫ":"Hamar OK","Ｏ　ＣＬＵＢ":"O Club","ＳＯＫＯＬ　ＫＯＳＴＥＬＥＣ　ＮＣＬ":"Sokol Kostelec nCl","讃州中学ＯＣ":"讃州中学OC","ＪＰＸランニング部":"JPXランニング部","東北大学ＯＬＣ":"東北大学OLC","北海道ＯＬ協会":"北海道OL協会","ＣＨＩＮＥＳＥ　ＴＡＩＰＥＩ　ＯＡ":"Chinese Taipei OA","神戸高校":"神戸高校","ＫＳＣ":"KSC","札幌農学校ＯＬＣ":"札幌農学校OLC","のまど":"のまど","大阪大学大学院":"大阪大学大学院","ＭＳ　ＰＡＲＭＡ":"MS Parma","ＵＭＫＳ　ＯＲＫＡＮ　ＯＳＴＲＯＤＡ":"UMKS Orkan Ostroda","ＬＫＳ　ＧＯＲＺＡＮＫＡ　ＮＡＷＯＪＯＷＡ　ＧＯＲＡ":"LKS Gorzanka Nawojowa Gora","ＣＯＣＡＴＡＬＵＮＹＡ":"COCatalunya","ＢＥＲＧＥＮＳ　ＴＦ":"Bergens TF","県立千葉高校":"県立千葉高校","同志社大学":"同志社大学","紅萌会":"紅萌会","ルーパー":"ルーパー","ＹＡＯＣ":"YAOC","中央大学附属中学校":"中央大学附属中学校","ムラナビ":"ムラナビ","ＡＮＧＥＬＮＩＥＭＥＮ　ＡＮＫＫＵＲＩ":"Angelniemen Ankkuri","ＩＦ　ＨＡＧＥＮ":"IF Hagen","ＯＫ　ＪＡＵＮＹＳＴＥ":"OK Jaunyste","ＬＯＮＤＯＮ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＫＬＵＢＢ":"London Orienteering Klubb","ＨＳＶ　ＳＰＩＴＴＡＬ":"HSV Spittal","ＤＥＲＷＥＮＴ　ＶＡＬＬＥＹ　ＯＲＩＥＮＴＥＥＲＳ":"Derwent Valley Orienteers","ＳＫ　ＳＫＩ　ＯＢ　ＳＴＥＲＮＢＥＲＫ":"SK SKI OB Sternberk","ＩＫ　ＳＴＥＲＮ":"IK Stern","ＴＩＰＯ　ＴＡＪＦＵＴＯ　ＥＳ　ＫＯＲＮＹＥＺＥＴＶＥＤＯ":"Tipo Tajfuto es Kornyezetvedo","徳島大":"徳島大","丘の上尾ＯＬＣ":"丘の上尾OLC","ファミリーＯＬＣ":"ファミリーOLC","東京都協会":"東京都協会","北九州市ＯＬ協会":"北九州市OL協会","宮崎県協会":"宮崎県協会","竜操ＯＬＣ":"竜操OLC","航走の会":"航走の会","ＮＤＣ":"NDC","聽障定向越野隊":"聽障定向越野隊","岡山市":"岡山市","ＥＳＴＯＮＩＡ":"Estonia","ＯＮＣ":"ONC","ＭＡＮＣＨＥＳＴＥＲ　ＡＮＤ　ＤＩＳＴＲＩＣＴ　ＯＲＩＥＮＴ":"Manchester and District Orient","ＯＤＤＩＬ　ＯＢ　ＫＯＴＬＡＲＫＡ":"Oddil OB Kotlarka","ＵＳＶ　ＴＵ　ＤＲＥＳＤＥＮ":"USV TU Dresden","ＯＯＢ　ＶＡＭＢＥＲＫ":"OOB Vamberk","ＫＦＫＩ　ＢＵＤＡＰＥＳＴ":"KFKI BUDAPEST","ＲＡＪＡ　ＫＡＲＪＡＬＡＮ　ＳＵＵＮＮＩＳＴＡＪＡＴ":"Raja Karjalan Suunnistajat","ＦＯＲＴＨ　ＶＡＬＬＥＹ　ＯＲＩＥＮＴＥＥＲＳ":"Forth Valley Orienteers","ＶＥＳＺＰＲＥＭＩ　ＨＯＮＶＥＤ　ＳＥ":"Veszpremi Honved SE","ＳＲＤ":"SRD","ＯＫ　９９　ＨＲＡＤＥＣ　ＫＲＡＬＯＶＥ":"OK 99 Hradec Kralove","ＲＡＩＳＵ　ＬＵＭＯＵＳ":"Raisu Lumous","ＶＡＳＴＥＲＡＳ　ＳＯＫ":"Vasteras SOK","ＭＯＤＵＭ　ＯＬ":"Modum OL","ＨＥＬＳＩＮＧＯＥＲ　ＳＯＫ":"Helsingoer SOK","ＢＹＡＳＥＮ　ＩＬ":"Byasen IL","ＳＯＣ　ＡＳＩＫＫＡＬＡ":"SOC Asikkala","ＩＦ　ＭＡＲＩＮ　ＶＥＳＴ":"IF Marin Vest","あいちシニア":"あいちシニア","よだかＯＣ":"よだかOC","仙台ＯＬＣ":"仙台OLC","加賀市":"加賀市","京都工芸繊維大学":"京都工芸繊維大学","小松市ＯＬＫ":"小松市OLK","仙台泉松陵ＯＬＦ":"仙台泉松陵OLF","ＮＡＶＩＴＡＢＩ":"NaviTabi","修学院中学校ワンダーフォーゲル部":"修学院中学校ワンダーフォーゲル部","未来の玉露":"未来の玉露","ＳＫ　ＳＡＵＥ　ＴＡＭＭＥＤ":"SK Saue Tammed","ＵＫＳ　ＡＺＹＭＵＴ　ＤＥＢＯＷ":"UKS Azymut Debow","ＣＰＯＣ":"CPOC","ＪＡＭＳＡＮ　ＲＥＴＫＩ　ＶＥＩＫＯＴ":"Jamsan Retki Veikot","ＷＡＴ":"WAT","ＨＥＭＩＮＧ　ＯＲＩＥＮＴＥＲＩＮＧ":"Heming Orientering","ＳＴＡＶＡＮＧＥＲ　ＯＲＩＥＮＴＥＲＩＮＧＳＫＬＵＢＢ":"Stavanger Orienteringsklubb","ＩＫＨＰ　ＨＵＳＫＶＡＲＮＡ":"IKHP Huskvarna","いちすけ":"いちすけ","日大ＯＬＫ":"日大OLK","欅会":"欅会","松阪ＯＬＣ":"松阪OLC","チーム半アウトドア":"チーム半アウトドア","海原":"海原","中能登町":"中能登町","ＵＮＩＴＥＤ　ＳＴＡＴＥＳ":"United States","一橋":"一橋","ＭＯ":"MO","Ｚ":"Z","ＫＨ":"KH","日本データー":"日本データー","ＴＥＡＭ千姫":"TEAM千姫","ＭＡＣＳ":"MACS","美木中学校":"美木中学校","ＥＡＳＴＷＩＮＤ":"EASTWIND","ＣＥＮＴＲＵＭ　ＯＫ":"Centrum OK","ＳＯＤＥＲＳ－ＴＹＲＥＳＯ":"Soders-Tyreso","ＯＬ　ＴＲＯＬＬＥＬＧ":"OL Trollelg","ＦＯＳＳＵＭ　ＩＦ":"Fossum IF","ＳＴＩＧＭＡＮＮＥＮ　ＫＡＲＬＳＨＡＭＮＳ　ＯＫ":"Stigmannen Karlshamns OK","ＲＡＵＭＡＲ　ＯＲＩＥＮＴＥＲＩＮＧ":"Raumar Orientering","ＫＵＯＰＩＯＮ　ＳＵＵＮＮＩＳＴＡＪＡＴ":"Kuopion Suunnistajat","小平市":"小平市","せせりストリート":"せせりストリート","ＯＬＴ":"OLT","ＯＭＭ塾":"OMM塾","武相":"武相","龍谷ＯＬＣ":"龍谷OLC","中京ＯＣ":"中京OC","ＣＣＣＫ":"CCCK","ＯＬＣ吉備路":"OLC吉備路","地球":"地球","龍谷大学":"龍谷大学","解脱輪":"解脱輪","京葉ＯＬ":"京葉OL","立教大学":"立教大学","順天堂大学":"順天堂大学","浦和高校":"浦和高校","東京農業大学オホーツク":"東京農業大学オホーツク","ＷＳ会":"WS会","北海道大学大学院":"北海道大学大学院","國立清華大學學生會":"國立清華大學學生會","ＴＵＲ":"TUR","桃園高中":"桃園高中","ＣＺＥＣＨＩＡ":"Czechia","東大ＯＬＫ、一橋大学":"東大OLK、一橋大学","ＨＯＣ":"HOC","ＧＪＯＥ　ＶＡＲＤ　ＯＬ":"Gjoe Vard OL","ＵＫＳ　ＳＩＯＤＥＭＫＡ　ＲＵＭＩＡ":"UKS Siodemka Rumia","ＥＬＢＬＡＳＫＩ　ＫＬＵＢ　ＯＲＩＥＮＴＥＥＲＩＮＧＵ　ＥＫ":"Elblaski Klub Orienteeringu EK","ＬＡＨＤＥＮ　ＳＵＵＮＮＩＳＴＡＪＡＴ":"Lahden Suunnistajat","ＫＯＢ　ＫＬＡＤＮＯ":"KOB Kladno","ＬＡＩＨＩＡＮ　ＬＵＪＡ":"Laihian Luja","ＳＯＵＴＨＥＲＮ　ＮＡＶＩＧＡＴＯＲＳ　ＯＲＩＥＮＴＥＥＲＩ":"Southern Navigators Orienteeri","ＯＫ　ＤＪＥＲＦ":"OK Djerf","ＣＰＡＲＭＡＤＡ":"CPArmada","ＰＯＳＴ　ＳＶ　ＤＲＥＳＤＥＮ":"Post SV Dresden","ＩＳＴＡＮＢＵＬ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＳＫ":"ISTANBUL ORIENTEERING SK","ＴＵＲＵＮ　ＮＭＫＹ":"Turun NMKY","ＫＬＵＢＯＢＵＲＢＡＲＺＡＺＲＩＶＡ":"KlubOBUrbarZazriva","ＴＨＡＭＥＳ　ＶＡＬＬＥＹ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵ":"Thames Valley Orienteering Clu","ＳＯＢ　ＯＬＯＭＯＵＣ":"SOB Olomouc","ＯＬ　ＴＯＴＥＮＴＲＯＬＬ":"OL TotenTroll","ＧＤ４Ｃ　ＧＲＵＰＯ　ＤＥＳＰＯＲＴＩＶＯ　４　ＣＡＭＩＮＨ":"GD4C Grupo Desportivo 4 Caminh","ＩＴＡ　ＨＡＭＥＥＮ　ＲＡＳＴＩ":"Ita Hameen Rasti","ＣＯＧＡ　ＣＬＵＢＥ　ＤＥ　ＯＲＩＥＮＴＡＣＡＯ　ＧＲＡＬＨ":"COGA Clube de Orientacao Gralh","ＬＩＥＲＢＹＧＤＡ　ＯＲＩＥＮＴＥＲＩＮＧＳＬＡＧ":"Lierbygda Orienteringslag","ＣＳ　ＴＲＡＮＳＩＬＶＡ":"CS TranSilva","ＢＡＹＳＩＤＥ　ＫＡＮＧＡＲＯＯＳ　ＯＲＩＥＮＴＥＥＲＳ":"Bayside Kangaroos Orienteers","ＯＬＩＭＰ":"Olimp","ＯＫ　ＤＯＫＳＹ":"OK Doksy","ＨＡＤＥＬＡＮＤ　ＯＬ":"Hadeland OL","ＯＴＥＰＡＡ　ＳＫ":"Otepaa SK","ＲＩＮＧＥＲＩＫＥ　ＯＬ":"Ringerike OL","ＴＵＭＢＡ　ＭＡＬＡＲＨＯＪＤＥＮ　ＯＫ":"Tumba Malarhojden OK","ＯＫ　ＬＡＢＩＲＩＮＴＡＳ":"OK Labirintas","ＳＡＶＥＤＡＬＥＮＳ　ＡＩＫ":"Savedalens AIK","ＰＩＨＫＡＮＩＳＫＡＴ":"Pihkaniskat","ＴＩＦ　ＶＩＫＩＮＧ":"TIF Viking","ＫＥＲＡＶＡＮ　ＵＲＨＥＩＬＩＪＡＴ":"Keravan Urheilijat","ＯＫ　ＯＲＩＯＮ":"OK Orion","ＯＫ　ＭＯＳＳ":"OK Moss","ＡＣ　ＢＥＡＵＣＨＡＭＰ":"AC Beauchamp","ＲＡＳＴＩ　Ｅ":"Rasti E","ＯＫ　ＪＩＨＬＡＶＡ":"OK Jihlava","高松市立花園小学校":"高松市立花園小学校","ＤＶＯＡ":"DVOA","立命館ＯＬＣ":"立命館OLC","西宮市":"西宮市","ヨッチー海賊団":"ヨッチー海賊団","ＫＵＯＬＣ":"KUOLC","ケルッチャ青葉":"ケルッチャ青葉","徳島大学":"徳島大学","ＯＫ":"OK","金沢":"金沢","ＴＨＯ":"THO","京葉":"京葉","京大":"京大","國立中正大學定向越野代表隊":"國立中正大學定向越野代表隊","筑波":"筑波","ＨＯ":"HO","ＢＫＳ　ＷＡＴＡＨＡ　ＷＡＲＳＺＡＷＡ":"BKS Wataha Warszawa","ＳＬＡＳＫ　ＷＲＯＣＬＡＷ":"Slask Wroclaw","ＯＬＶ　ＳＴＥＩＮＢＥＲＧ":"OLV Steinberg","ＮＯ　ＣＬＵＢ":"No Club","ＯＫ　ＲＯＳＬＡＧＥＮ":"OK Roslagen","ＥＤＩＮＢＵＲＧＨ　ＳＯＵＴＨＥＲＮ　ＯＲＩＥＮＴＥＥＲＩＮ":"Edinburgh Southern Orienteerin","ＬＩＮＫＯＰＩＮＧＳ　ＯＫ":"Linkopings OK","ＫＡＪＡＡＮＩＮ　ＫＵＯＨＵ":"Kajaanin Kuohu","ＨＡＮＩＮＧＥ　ＳＯＫ":"Haninge SOK","ＯＫ　ＴＹＲ":"OK Tyr","ＫＵＮＧＡＬＶＳ　ＯＫ":"Kungalvs OK","ＩＫ　ＹＭＥＲ":"IK Ymer","ＮＯＲＤＲＥ　ＦＯＬＬＯ　ＯＲＩＥＮＴＥＲＩＮＧ":"Nordre Follo Orientering","ＭＡＡＲＩＡＮ　ＭＡＨＴＩ":"Maarian Mahti","ＳＴＲＡＮＧＮＡＳ　ＭＡＬＭＢＹ　ＯＬ":"Strangnas Malmby OL","渡邉一門":"渡邉一門","横浜国立大学大学院":"横浜国立大学大学院","ＯＬＣフルハウス":"OLCフルハウス","愛知県立半田高校":"愛知県立半田高校","新大ＯＢ":"新大OB","名古屋市":"名古屋市","新潟大学ＯＣ":"新潟大学OC","七尾市ＯＬＫ":"七尾市OLK","ＴＡＩＷＡＮ":"TAIWAN","名古屋工業大学":"名古屋工業大学","いたやいたや":"いたやいたや","美唄林試ＸＣ":"美唄林試XC","Ｄ":"D","Ｈ":"H","Ｉ":"I","Ｅ":"E","Ｆ":"F","Ｇ":"G","東京大学大学院":"東京大学大学院","ＬＡＴＶＩＡ":"Latvia","広島大学ＯＬＣ":"広島大学ＯＬＣ","玄米茶":"玄米茶","ＲＡＳＴＩＶＡＲＳＡＴ":"Rastivarsat","ＡＲＡＫ":"ARAK","ＩＬ　ＧＵＬＡＲ":"IL Gular","ＳＫＩＥＮ　ＯＫ":"Skien OK","ＨＥＬＳＩＮＧＢＯＲＧＳ　ＳＯＫ":"Helsingborgs SOK","ＮＹＫＯＰＩＮＧＳ　ＯＫ":"Nykopings OK","ＯＫ　ＫＯＬＭＡＲＤＥＮ":"OK Kolmarden","ＫＥＳＫＩ　ＫＡＲＪＡＬＡＮ　ＲＡＳＴＩ":"Keski Karjalan Rasti","ＳＫＥＬＬＥＦＴＥＡ　ＯＫ":"Skelleftea OK","ＣＰＨＫ":"CPHK","ハヤブサ財団":"ハヤブサ財団","京都大学大学院":"京都大学大学院","北九州市ＯＬ協会・杏友会":"北九州市OL協会・杏友会","岡崎":"岡崎","ＯＪＩ":"OJI","ＧＲＯＣ":"GROC","工化会":"工化会","広大":"広大","大崎ＯＬＣ":"大崎OLC","金沢大":"金沢大","麻布学園オリエンテーリング部":"麻布学園オリエンテーリング部","麻布中学校・高等学校":"麻布中学校・高等学校","ＧＥＲ":"GER","東京大学オリエンテーリングクラブ":"東京大学オリエンテーリングクラブ","ＬＡＴ":"LAT","Ｓ":"S","ＪＡＮＤＡＲＭＡ　ＧＵＣＵ　ＳＫ":"Jandarma Gucu SK","ＭＫＳ　ＭＥＴＡＬＯＷＩＥＣ　ＬＯＤＺ":"MKS Metalowiec Lodz","ＯＭＥＧＡ":"Omega","ＯＫ　ＴＡＫＡＳ":"OK Takas","ＯＺＯＮＳ":"Ozons","ＳＫ　ＰＯＨＪＡＮＴＡＨＴＩ":"SK Pohjantahti","ＯＫ　ＯＥＳＴ　ＢＩＲＫＥＲＯＥＤ":"OK Oest Birkeroed","ＫＡＰＡ　ＯＫ":"Kapa OK","ＧＯＤＯＬＬＯＩ　ＫＩＲＣＨＨＯＦＥＲ　ＪＯＺＳＥＦ　ＳＥ":"Godolloi Kirchhofer Jozsef SE","ＣＬＵＢＥ　ＤＥ　ＡＶＥＮＴＵＲＡ　Ｅ　ＯＲＩＥＮＴＡＣＡＯ":"Clube de Aventura e Orientacao","ＡＺＹＭＵＴ":"Azymut","ＡＡＬＢＯＲＧ　ＯＫ":"Aalborg OK","ＦＩＦ　ＨＩＬＬＥＲＯＥＤ　ＯＲＩＥＮＴＥＲＩＮＧ":"FIF Hilleroed Orientering","ＭＫＳ　ＰＡＵＬＩＮＵＭ　ＪＥＬＥＮＩＡ　ＧＯＲＡ":"MKS Paulinum Jelenia Gora","ＴＯＲＥＫＶＥＳ　ＳＥ":"Torekves SE","ＩＦＫ　ＧＯＴＥＢＯＲＧ　ＯＲＩＥＮＴＥＲＩＮＧ":"IFK Goteborg orientering","ＢＩＥＬＥＦＥＬＤＥＲ　ＴＧ":"Bielefelder TG","ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＩＮＣＩＮＮＡＴＩ":"Orienteering Cincinnati","ＯＯＢ　ＴＪ　ＤＵＫＬＡ　ＰＲＡＨＡ":"OOB TJ DUKLA PRAHA","ＳＨＩＺＵＯＫＡ　ＯＬＣ":"Shizuoka OLC","ＳＳＶ　ＰＬＡＮＥＴＡ　ＲＡＤＥＢＥＵＬ":"SSV Planeta Radebeul","ＥＳ　ＫＡＮＴＯ　ＣＬＵＢ":"ES Kanto Club","ＫＡＲＫＫＩＲＡＳＴＩ":"KarkkiRasti","ＨＡＵＧＥＳＵＮＤ　ＩＬ":"Haugesund IL","ＴＩＳＶＩＬＤＥ　ＨＥＧＮ　ＯＫ":"Tisvilde Hegn OK","ＴＪ　ＳＬＡＶＩＡ　ＺＩＬＩＮＳＫＡ　ＵＮＩＶＥＲＺＩＴＡ":"TJ Slavia Zilinska univerzita","ＯＬＧ　ＳＴ．　ＧＡＬＬＥＮ":"OLG St. Gallen","ＡＰＰＥＮＺＥＬＬ":"Appenzell","ＭＡＬＡＲＲＵＴＡ":"Malarruta","ＶＡＡＪＡＫＯＳＫＥＮ　ＴＥＲＡ":"Vaajakosken Tera","ＷＥＳＴ　ＣＵＭＢＥＲＬＡＮＤ　ＯＲＩＥＮＴＥＥＲＩＮＧ　Ｃ":"West Cumberland Orienteering C","ＨＨ":"HH","ＭＡＬＭＯ　ＯＫ":"Malmo OK","ＮＡＴＵＲＦＲＥＵＮＤＥ　ＬＩＮＺ":"Naturfreunde Linz","ＷＩＮＧ　ＯＫ":"Wing OK","ＶＡＸＪＯ　ＯＫ":"Vaxjo OK","ＳＥＮＤＡ":"Senda","ＧＯＴＬＡＮＤＳ　ＢＲＯ　ＯＫ":"Gotlands Bro OK","ＳＣＡＰＡ　ＮＡＮＣＹ　ＯＲＩＥＮＴＡＴＩＯＮ":"Scapa NANCY Orientation","ＫＯＲＳＮＡＳ　ＩＦ　ＯＫ":"Korsnas IF OK","ＡＬＦＴＡ　ＯＳＡ　ＯＫ":"Alfta Osa OK","ＦＯＲＳＡ　ＯＫ":"Forsa OK","ＥＰＩＬＡＮ　ＥＳＡ":"Epilan Esa","ＨＥＳＴＲＡ　ＩＦ":"Hestra IF","ＳＪＯＶＡＬＬＡ　ＦＫ":"Sjovalla FK","ＩＦ　ＴＨＯＲ":"IF Thor","ＤＡＲＴＦＯＲＤ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＫＬＵＢＢ":"Dartford Orienteering Klubb","ＴＪ　ＳＴＡＲＴ　ＮＡＣＨＯＤ":"TJ Start Nachod","ＳＯＵＴＨＤＯＷＮＳ　ＯＲＩＥＮＴＥＥＲＳ":"Southdowns Orienteers","ＴＩＢＲＯ　ＯＫ":"Tibro OK","ＯＫ　ＤＩＦ":"OK DIF","ＡＮＤＥＢＵ　ＩＬ":"Andebu IL","ＭＡＬＶＩＫ　ＩＬ":"Malvik il","ＳＡＬＯＮ　ＶＩＥＳＴＩ":"Salon Viesti","ＣＡＤＯＣ":"CADOC","ＵＮＩＴＯＰ　ＺＤＡＲ":"UNITOP Zdar","ＬＯＩＭＡＡＮ　ＪＡＮＫＫＯ":"Loimaan Jankko","ＦＯＥＲＤＥ　ＩＬ":"Foerde IL","ＳＴＯＲＤ　ＯＲＩＥＮＴＥＲＩＮＧ":"Stord Orientering","ＶＡＬＫＥＡＫＯＳＫＥＮ　ＨＡＫＡ":"Valkeakosken Haka","ＮＩＤＡＲＯＥＳＴ　ＯＫ":"Nidaroest OK","ＦＯＲＳＥＲＵＭＳ　ＳＯＫ":"Forserums SOK","ＧＯＴＥＢＯＲＧ　ＭＡＪＯＲＮＡ　ＯＫ":"Goteborg Majorna OK","ＴＲＥＮＴＯ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＡＳＤ":"Trento Orienteering ASD","ＯＬ－ＴＥＡＭＦＩＬＤＥＲ":"OL-TeamFilder","てれゴンの会":"てれゴンの会","島根県協会":"島根県協会","ＳＩＸ":"SIX","ＰＡＯＣ":"PAOC","ＪＷＯＣ代表":"JWOC代表","スタッフ":"スタッフ","かすいち倶楽部":"かすいち倶楽部","丘の民":"丘の民","ＯＣオフィシャル":"OCオフィシャル","一橋ＯＬＫ":"一橋OLK","矢田野校下":"矢田野校下","かじの会":"かじの会","蓮代寺校下":"蓮代寺校下","福井市":"福井市","鞍部同好会":"鞍部同好会","名古屋市立大学":"名古屋市立大学","名椙コーチ":"名椙コーチ","ＫＡＬＥＶＡＮ　ＲＡＳＴＩ":"Kalevan Rasti","神奈川県":"神奈川県","九州大学大学院":"九州大学大学院","くまのＯＬＣ":"くまのOLC","Ｒナビスポ部":"Rナビスポ部","ＢＵＬＧＡＲＩＡ":"Bulgaria","筑波大学体育会オリエンテーリング部":"筑波大学体育会オリエンテーリング部","東農大三校":"東農大三校","玉露":"玉露","ＳＯＤＥＲＴＡＬＪＥ　ＮＹＫＶＡＲＮ　ＯＲＩＥＮＴＥＲＩＮＧ":"Sodertalje Nykvarn Orientering","ＭＵＲＣＩＡ　Ｏ":"Murcia O","ＳＫ　ＭＥＲＣＵＲＹ":"SK Mercury","ＯＲＩＥＮＴＥＥＲＩＮＧ　ＫＬＯＳＴＥＲＮＥＵＢＵＲＧ":"Orienteering Klosterneuburg","ＫＡＲＨＵＬＡＮ　ＫＯＲＶＥＮＫＩＥＲＴＡＪＡＴ":"Karhulan Korvenkiertajat","ＬＯＵＮＡＩＳ　ＨＡＭＥＥＮ　ＲＡＳＴＩ":"Lounais Hameen Rasti","ＨＩＩＳＩＲＡＳＴＩ":"Hiisirasti","ＪＯＵＴＳＥＮＯＮ　ＫＵＬＬＥＲＶＯ":"Joutsenon Kullervo","ＯＬＧ　ＳＴＲＯＥＣＫ　ＷＩＥＮ":"OLG Stroeck Wien","ＯＳＬＯＳＴＵＤＥＮＴＥＮＥＳ　ＩＫ":"Oslostudentenes IK","ＶＥＳＴＲＥ　ＡＫＥＲＳ　ＳＫＩＫＬＵＢ":"Vestre Akers Skiklub","ＢＯＤＥＮＳ　ＢＫ　ＯＳ":"Bodens BK OS","ＯＫ　ＴＯＲ":"OK Tor","ＥＧＲＩ　ＴＥＳＴＥＤＺＯ　ＣＬＵＢ":"Egri Testedzo Club","ＯＫ　ＳＰＯＲＴ":"OK Sport","ＲＵＥＮ　９２　ＫＵＹＳＴＥＮＤＩＬ":"Ruen 92 Kuystendil","ＣＳ　ＭＥＮＴＯＲ　ＳＩＬＶＡ":"CS Mentor Silva","ＲＵＪＩＥＮＡ":"Rujiena","ＫＲＩＳＴＩＡＮＳＡＮＤ　ＯＫ":"Kristiansand OK","ラジオリエンズ":"ラジオリエンズ","白峰会":"白峰会","大阪ＯＬＣおろしの会":"大阪OLCおろしの会","磨くっちゃ漢":"磨くっちゃ漢","尾道市立美木中学校":"尾道市立美木中学校","ＡＳＪＹＯＣ代表":"AsJYOC代表","マッパ":"マッパ","第一校下":"第一校下","同志社ＯＬＣ":"同志社OLC","芦城校下":"芦城校下","粟津校下":"粟津校下","加波一族紫組":"加波一族紫組","十文字学園女子大学":"十文字学園女子大学","東農大三中":"東農大三中","椙山コーチ":"椙山コーチ","ＹＮＯＫ":"YNOK","ＯＬＣ　ルーパー":"OLC ルーパー","立命館":"立命館","アスリート委員会":"アスリート委員会","兵庫県":"兵庫県","岩手県オリエンテーリング協会":"岩手県オリエンテーリング協会","岐阜県":"岐阜県","Ｋ":"K","だいふくファンクラブ":"だいふくファンクラブ","丘珠ウインズ":"丘珠ウインズ","黒田家":"黒田家","ＢＯＫＫＥＲＳ":"BOKKERS","蹴上":"蹴上","慶応義塾大学":"慶応義塾大学","ＢＬＵＥ　ＮＩＧＨＴ":"BLUE NIGHT","ＩＮＤＩＶＩＤＵＡＬ":"Individual","ＡＮＴＴＯＬＡＮ　ＵＲＨＥＩＬＩＪＡＴ":"Anttolan Urheilijat","ＬＥＫＳＡＮＤＳ　ＯＫ":"Leksands OK","ＳＫ　ＴＲＩＴＵＲＵＳ　ＮＩＴＲＡ":"SK Triturus Nitra","ＮＯＴＯＤＤＥＮ　ＯＬ":"Notodden OL","ＺＡＭＯＮＩＴ":"Zamonit","ＢＯＲＤＥＲ　ＬＩＮＥＲＳ":"Border Liners","ＳＵＯＭＵＳＪＡＲＶＥＮ　ＳＩＳＵ":"Suomusjarven Sisu","ＳＫＡＲＰＮＡＣＫＳ　ＯＬ":"Skarpnacks OL","ＤＥＶＹＮＩ　ＯＳＫ":"Devyni OSK","ＯＫ　ＣＡＲＮＩＫＡ":"OK Carnika","ＩＫ　ＧＲＡＮＥ　ＡＲＥＮＤＡＬ　ＯＲＩＥＮＴＥＲＩＮＧ":"IK Grane Arendal Orientering","ＴＪ　ＯＰＡＶＡ":"TJ Opava","ＯＫ　ＲＯＤＨＥＮ":"OK Rodhen","ＳＯＬＮＡ　ＯＫ":"Solna OK","ＳＡＫＵ":"Saku","ＵＭＥＡ　ＯＫ":"Umea OK","ＮＡＴＵＲＦＲＥＵＮＤＥ　ＷＩＥＮ":"Naturfreunde Wien","ＦＥＳＴＩＮＡ　ＬＥＮＴＥ":"FESTINA LENTE","小泉家":"小泉家","ＩＧ岡山ランナーズ":"IG岡山ランナーズ","ＨＡＰＰＹ　ＯＲＩＥＮＴＥＥＲＩＮＧ":"Happy Orienteering","晴れの国岡山ＯＬＣ":"晴れの国岡山OLC","社工":"社工","強化委員会":"強化委員会","調布市ウォークリング協会":"調布市ウォークリング協会","苗代校下":"苗代校下","横浜市立大学大学院":"横浜市立大学大学院","東北大":"東北大","ＭＣジャンパーズ":"mcジャンパーズ","西蒲ＯＣ":"西蒲OC","栃尾南小学校":"栃尾南小学校","力愙運動":"力愙運動","彰化定向越野":"彰化定向越野","二本松ＯＬＣ":"二本松OLC","麻布学園ＯＢ":"麻布学園OB","ＴＥＲＲＡＸ":"TerraX","松本ＯＬＣ":"松本OLC","ＣＲＡＺＹＧＵＹＳ":"CrazyGuys","飞鸟定向":"飞鸟定向","ネコ飼いたい":"ネコ飼いたい","丘の上関西支部":"丘の上関西支部","東京ハセツネクラブ":"東京ハセツネクラブ","ＴＰＥ　ＤＥＡＦＬＹＭＰＩＣＳ　ＴＥＡＭ":"TPE Deaflympics Team","ＴＯＲＯＮＴＯ　ＯＣ":"Toronto OC","奈良女":"奈良女","東京都":"東京都","横浜市":"横浜市","ＢＥＳＴ　ＯＣ":"BEST OC","愛台灣定向越野俱樂部":"愛台灣定向越野俱樂部","樹林健腳隊":"樹林健腳隊","角本一門":"角本一門","岐阜三重":"岐阜三重","東京農工大学オリエンテーリング部":"東京農工大学オリエンテーリング部","日本":"日本","ＬＩＦＥ":"Life","科学大":"科学大","トータス金沢支部":"トータス金沢支部","颪の会":"颪の会","梅木小学校":"梅木小学校","ＦＨＵＴＡ":"FHUTA","ＩＮＤＥＰＥＮＤＥＮＴ":"Independent","ＢＵＬ":"BUL","ＬＩＴＨＵＡＮＩＡ":"Lithuania","お茶の水女子":"お茶の水女子","ＮＹＤＡＬＥＮＳ　ＳＫＩＫＬＵＢ":"Nydalens Skiklub","加波一族　紫組":"加波一族　紫組","新潟大学大学院":"新潟大学大学院","筑波大学大学院・ときわ走林会":"筑波大学大学院・ときわ走林会","新茶":"新茶","ＫＦＢ":"KFB","Ｌ":"L","Ｊ":"J","追手門学院大学":"追手門学院大学","木場校下":"木場校下","京医陸ＡＣ":"京医陸AC","信大ＯＣ":"信大OC","香美町":"香美町","ＬＥＯ　ＴＥＡＭ":"LeO Team","ＯＫ　ＲＯＺＴＯＫＹ":"OK Roztoky","ＴＡＭＰＥＲＥＥＮ　ＰＹＲＩＮＴＯ":"Tampereen Pyrinto","ＥＯＮＴＯＵＲＳ":"EONTOURS","ＯＲＩＥＮＴＥＥＲＩＮＧ　ＡＳＳＯＣＩＡＴＩＯＮ　ＳＩＮＧＡ":"Orienteering Association Singa","ＭＯＭ　ＢＵＤＡＰＥＳＴ":"MOM Budapest","ＯＬＶ　ＭＩＮＯＲ":"OLV MINOR","ＭＩＬＩＴＡＲＹ　ＵＮＩＶＥＲＳＩＴＹ　ＯＦ　ＬＡＮＤ　ＦＯ":"Military University of Land Fo","ＳＢＫ　ＢＬＡＮＳＫＯ":"SBK Blansko","ＥＩＮＴＲＡＣＨＴ　ＭＵＮＳＴＥＲ":"Eintracht Munster","ＫＯＳＣＩＥＬＥＣ　ＣＨＲＺＡＮＯＷ":"KOSCIELEC CHRZANOW","ＨＳＰ　ＯＲＩＥＮＴＥＥＲＩＮＧ":"HSP orienteering","ＳＭＯＧ":"SMOG","ＡＬＣＯＩ":"Alcoi","ＥＳＰＯＯＮ　ＡＫＩＬＬＥＳ":"Espoon Akilles","ＯＲＩＥＮＴＥＥＲＩＮＧ　ＳＥＥＤＳ　ＨＫ":"Orienteering Seeds HK","ＳＵＯＳＭＥＲＥＮ　ＳＡＬＰＡ":"Suosmeren Salpa","ＡＬＮＩＳ　ＯＫ":"Alnis OK","ＯＬ　ＴＥＡＭ　ＦＩＬＤＥＲ":"OL Team Filder","ＳＡＬＯＮ　ＶＩＬＰＡＳ":"Salon Vilpas","ＫＳＯ　Ｏ　ＣＯＭＰＡＳＳ":"KSO O Compass","ＵＫＳ　ＥＮＥＲＧＥＴＹＫ　ＤＹＣＨＯＷ":"UKS Energetyk Dychow","ＢＥＲＬＩＮＥＲ　ＴＵＲＮＥＲＳＣＨＡＦＴ":"Berliner Turnerschaft","ＭＥＬＢＯＵＲＮＥ　ＦＯＲＥＳＴ　ＲＡＣＥＲＳ":"Melbourne Forest Racers","ＩＮＤＲＥ　ＯＳＴＦＯＬＤ　ＯＫ":"Indre Ostfold OK","ＳＡＮＳ　ＳＯＵＣＩ":"Sans Souci","ＰＳＫ　ＰＯＢＥＤＡ":"PSK Pobeda","ＴＪ　ＲＡＰＩＤ　ＢＲＡＴＩＳＬＡＶＡ":"TJ Rapid Bratislava","ＰＵＮＫＡＬＡＩＴＵＭＥＮ　ＫＵＮＴＯ":"Punkalaitumen Kunto","ＡＲＤＯＣ":"ARDOC","ＳＫ　ＨＡＤＶＥＯ　ＢＡＮＳＫＡ　ＢＹＳＴＲＩＣＡ":"SK HADVEO Banska Bystrica","ＩＮＤＩＶＩＤＵＡＬＩ":"Individuali","ＯＫ　ＷＥＳＴ":"OK West","ＯＰＰＳＡＬ　ＯＲＩＥＮＴＥＲＩＮＧ":"Oppsal Orientering","ＶＡＬＬＥＮＴＵＮＡ　ＯＳＳＥＢＹ　ＯＬ":"Vallentuna Osseby OL","ＵＮＩＶＥＲＳＩＤＡＤＥ　ＤＥ　ＶＩＧＯ":"Universidade de Vigo","ＯＫ　ＫＬＡＪＵＮＡＳ":"OK Klajunas","ＦＩＮＮＩＳＨ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＦＥＤＥＲＡＴＩＯ":"Finnish Orienteering Federatio","ＲＯＹＡＬ　ＡＩＲ　ＦＯＲＣＥ　ＯＲＩＥＮＴＥＥＲＩＮＧ　Ｒ":"Royal Air Force Orienteering R","ＣＳ　ＲＵＮ　ＫＯＭＰＡＳＳ":"CS Run Kompass","ＣＯＬＥ":"COLE","ＯＫ　ＭＯＴＡＬＡ":"OK Motala","ＩＮＤＹＷＩＤＵＡＬＮＹ　ＭＡＺＯＷＩＥＣＫＩＥ":"Indywidualny Mazowieckie","ＳＫ　ＦＡＲＭＡＣＥＵＴ　ＢＲＡＴＩＳＬＡＶＡ":"SK Farmaceut Bratislava","ＯＢ　ＯＰＡＶＡ":"OB Opava","ＯＢ　ＪＥＮＩＳＯＶＩＣＥ":"OB Jenisovice","ＯＫ　ＬＯＫＯＭＯＴＩＶＡ　ＰＬＺＥＮ":"OK Lokomotiva Plzen","ＧＥＲＥＣＳＥ　ＴＡＪＦＵＴＯ　ＣＬＵＢ":"Gerecse Tajfuto Club","ＶＩＶＥ　ＩＢＥＲＩＡ　ＯＲＩＥＮＴＡＣＩＯＮ":"Vive IBERIA Orientacion","ＮＹＤＡＬＥＮＳ　ＳＫ":"Nydalens SK","ＳＯＫ　ＴＲＡＦＦ":"SOK Traff","ＯＳＫ　ＳＡＫＡＳ":"OSK Sakas","ＯＬＰ　ＨＹＯＧＯ":"OLP Hyogo","ＳＡＮＤＮＥＳ　ＩＬ":"Sandnes IL","ＫＯＢ　ＫＯＮＩＣＥ":"KOB Konice","ＨＥＲＬＵＦＳＨＯＬＭ　ＯＫ":"Herlufsholm OK","ＨＡＧＡＢＹ　ＧＯＩＦ":"Hagaby GoIF","ＬＩＮＣＯＬＮ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＧＲＯＵＰ":"Lincoln Orienteering Group","ＫＬＵＢ　ＩＮＯ　ＳＴＯＷＡＲＺＹＳＺＥ":"Klub InO STOWARZYSZE","ＶＯＳＨＯＤ":"Voshod","ＯＫ　ＶＩＨＯＲ":"OK Vihor","ＱＯ":"QO","ＴＳＶ　ＮＵＳＳＥ":"TSV Nusse","ＴＪ　ＳＯＫＯＬ　ＫＲＡＬＵＰＹ　ＮＡＤ　ＶＬＴＡＶＯＵ":"TJ Sokol Kralupy nad Vltavou","ＯＲＩＥＮＴＡＣＩＪＳＫＩ　ＫＬＵＢ　ＢＲＥＺＩＣＥ":"Orientacijski klub Brezice","ＡＲＧＵＳ":"Argus","ＣＳ　ＢＡＢＡＲＵＮＣＡ":"CS Babarunca","ＩＳＴＲＵＭＳ　ＳＫ":"Istrums SK","ＳＫ　ＶＵＯＫＳＩ":"SK Vuoksi","ＬＵＴＳＫＦＳＯ":"LutskFSO","ＲＡＳＴＩ":"Rasti","ＡＳＩＫＫＡＬＡＮ　ＲＡＩＫＡＳ":"Asikkalan Raikas","ＬＵＴＳＫ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＦＥＤＥＲＡＴＩＯＮ":"Lutsk Orienteering Federation","ＯＫ　ＳＫＥＩＤＩ":"OK Skeidi","ＬＡＰＰＥＥＮ　ＲＩＥＮＴＯ":"Lappeen Riento","ＳＴＡＮＧＥＮＡＳ　ＡＩＳ":"Stangenas AIS","ＨＡＬＤＥＮ　ＳＫ":"Halden SK","ＡＵＳＴＭＡＲＫＡ　ＩＬ　Ｏ　ＧＲＵＰＰＥ":"Austmarka IL O gruppe","ＲＡＳＴＩ　ＮＯＫＩＡ":"Rasti Nokia","ＯＳ　ＯＲＩＥＮＴＥＲＩＮＧＳＫＬＵＢＢ":"Os Orienteringsklubb","ＳＴＯＲＶＩＫＳ　ＩＦ":"Storviks IF","ＩＣＯＮＥ　ＳＥＮＳ":"Icone Sens","ＳＩＬＡＧＩＲＥ":"Silagire","ＥＳＯＣ":"ESOC","ＴＡＬＡＮＴ　ＳＰＯＲＴ　ＯＲＩＥＮＴＡＴＩＯＮ":"Talant Sport Orientation","ＯＫ　ＳＡＵＬＥ":"OK Saule","ＳＡＭＮＡＮＧＥＲ":"Samnanger","ＳＴ　ＨＥＬＥＮＳ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"St Helens Orienteering Club","ＳＡＶＯＮ　ＳＵＵＮＴＡ":"Savon Suunta","ＢＩＥＬＳＫＯ　ＢＩＡＬＡ　Ｏ　ＴＥＡＭ":"Bielsko Biala O Team","ＳＵＮＫＹ　ＯＣ":"Sunky OC","ＭＯＴＡＬＡ　ＡＩＦ　ＯＬ":"Motala Aif Ol","ＯＫ　ＪＡＰＥＴＩＣ":"OK Japetic","ＯＫ　ＶＩＶＩＬＬ":"OK Vivill","ＵＰ　ＮＯＲＴＨ　ＯＲＩＥＮＴＥＥＲＳ":"Up North Orienteers","ＣＯＳＥＣ":"COSEC","ＩＮＵＳ　ＬＡＰＰＥＥＮＲＡＮＴＡ":"INUS Lappeenranta","ＭＫＳ　ＳＫＡＲＭＡＴ　ＴＯＲＵＮ":"MKS Skarmat Torun","ＳＫ　ＲＡＤＩＯＫＬＵＢ　ＢＬＡＮＳＫＯ":"SK Radioklub Blansko","ＫＯＳ　ＴＪ　ＬＯＫＯＭＯＴＩＶＡ　ＫＲＮＯＶ":"KOS TJ Lokomotiva Krnov","ＦＲＥＤＲＩＫＳＴＡＤ　ＳＫＩＫＬＵＢＢ":"Fredrikstad Skiklubb","ＣＥ　ＣＯＬＩＶＥＮＣ":"CE COLIVENC","ＯＬＩＦＡＮＴ":"OLifant","ＨＳＶ　ＲＩＥＤ":"HSV Ried","ＳＡＮＤＥ　ＳＫ":"Sande SK","ＨＡＭＥＥＮＬＩＮＮＡＮ　ＳＵＵＮＮＩＳＴＡＪＡＴ":"Hameenlinnan Suunnistajat","ＯＬＡＶＩＮ　ＲＡＳＴＩ":"Olavin Rasti","ＣＥＮＴＲＡＬ　ＣＯＡＳＴ　ＯＲＩＥＮＴＥＥＲＳ":"Central Coast Orienteers","ＣＳ　ＯＴＯＰＥＮＩ":"CS Otopeni","ＧＡＶＬＥ　ＯＫ":"Gavle OK","ＳＫＯＧＳＬＵＦＦＡＲＮＡＳ　ＯＫ":"Skogsluffarnas OK","ＥＩＫＥＲ　ＯＬ":"Eiker OL","ＰＩＴＥＡ　ＩＦ　ＯＲＩＥＮＴＥＲＩＮＧＳＫＬＵＢＢ":"Pitea IF Orienteringsklubb","ＨＡＭＥＥＮＬＩＮＮＡＮ　ＴＡＲＭＯ":"Hameenlinnan Tarmo","ＬＵＸＥＭＢＯＵＲＧ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"Luxembourg Orienteering Club","ＤＲＩＡＤＡ":"Driada","ＬＡＫＥＬＡＮＤ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"Lakeland Orienteering Club","ＲＡＳＴＩ　ＰＥＲＮＩＯ":"Rasti Pernio","ＯＫ　ＫＡＲＥ":"OK Kare","ＮＯＲＴＨ　ＷＥＳＴ":"North West","ＯＲＩＶＥＤＥＮ　ＰＯＮＮＩＳＴＵＳ":"Oriveden Ponnistus","ＴＡ　ＯＫ":"TA OK","ＳＴＯＫＫＥ　ＩＬ":"Stokke IL","ＳＯＬ　ＴＲＡＮＡＳ":"SOL Tranas","ＳＫ　ＬＯＢ　ＮＯＶＡ　ＰＡＫＡ":"SK LOB Nova Paka","ＴＥＡＭ　ＳＨＩＲＡＫＡＢＡ":"Team Shirakaba","ＳＬＡＳＫ　ＯＴＥＡＭ":"Slask OTeam","ＯＫ　ＴＹＲＩＮＧＥ":"OK Tyringe","ＲＵＤＳＢＹＧＤ　ＩＬ":"Rudsbygd IL","ＯＳＴＥＲＳＵＮＤＳ　ＯＫ":"Ostersunds OK","ＯＬ　ＶＡＬＬＳＥＴ　ＳＴＡＮＧＥ":"OL Vallset Stange","ＩＫ　ＤＲＡＮ":"IK Dran","ＯＬＣ　ＷＩＥＮＥＲＷＡＬＤ":"OLC Wienerwald","ＳＡＲＰＳＢＯＲＧ　ＯＬ":"Sarpsborg OL","ＤＥＶＯＮ":"DEVON","ＨＩＩＤＥＮＫＩＥＲＴＡＪＡＴ":"Hiidenkiertajat","ＯＫ　ＲＯＳＫＩＬＤＥ":"OK Roskilde","ＴＯＮＳＢＥＲＧ　ＯＧ　ＯＭＥＧＮ　ＯＬ":"Tonsberg og omegn OL","ＫＶＡＲＮＳＶＥＤＥＮＳ　ＧＯＩＦ　ＯＫ":"Kvarnsvedens GoIF OK","ＭＡＲＫＢＹＧＤＥＮＳ　ＯＫ":"Markbygdens OK","ＳＮＡＴＴＲＩＮＧＥ　ＳＫ":"Snattringe SK","ＫＯＵＶＯＬＡＮ　ＳＵＵＮＮＩＳＴＡＪＡＴ":"Kouvolan Suunnistajat","ＭＵＬＬＳＪＯ　ＳＯＫ":"Mullsjo SOK","ＲＯＮＮＥＢＹ　ＯＫ":"Ronneby OK","ＫＯＬＤＩＮＧ　ＯＫ":"Kolding OK","ＣＯＴＳ":"COTS","ＳＫ　ＺＡＢＯＶＲＥＳＫＹ　ＢＲＮＯ":"SK Zabovresky Brno","ＴＡＢＹ　ＯＫ":"Taby OK","ＴＡＫＡ　ＴＯＫ":"TAKA TOK","ＡＬＬＥＲＯＥＤ　ＯＫ":"Alleroed OK","ＫＩＬＯＮ　ＫＹＬＬＩＫＩＴ":"Kilon Kyllikit","ＳＡＵＶＯＮ　ＵＲＨＥＩＬＩＪＡＴ":"Sauvon Urheilijat","ＭＵＳＴＡＬＡＭＭＥＮ　ＰＡＬＬＯ":"Mustalammen Pallo","狛江ＯＬＣ":"狛江OLC","東工大現役":"東工大現役","ＵＣＯＣ":"UCOC","ＭＴＢＯ　ＪＡＰＡＮ":"MTBO Japan","ＰＥＡＮＵＴＳ":"Peanuts","ねぎたんしお":"ねぎたんしお","ＳＯＬＣ":"SOLC","ＲＵＮＮＩＮＧ　ＳＵＰＰＯＲＴ":"running support","ルミカルフＯＣ":"ルミカルフOC","ほーりーず":"ほーりーず","千葉県立千葉高等学校":"千葉県立千葉高等学校","ＳＨＩＫＡＡＳ":"ShikaaS","全国上位１０割軍団":"全国上位10割軍団","ムラスプ":"ムラスプ","伊達市":"伊達市","ＦＦＰＢ":"FFPB","福山市立城南中学校":"福山市立城南中学校","生物":"生物","練馬ＯＬＣ　トータス":"練馬OLC トータス","長野県ＯＬ協会":"長野県OL協会","あざおＯＬＣ":"あざおOLC","都立大崎高校":"都立大崎高校","宮城県協会":"宮城県協会","明治大学":"明治大学","千葉市":"千葉市","磨っちゃ漢":"磨っちゃ漢","真室川レーシングチーム":"真室川レーシングチーム","ＴＣＮＰ家族":"TCNP家族","Ｂチーム":"bチーム","長町":"長町","ＦＷＯＣ":"FWOC","墨田区":"墨田区","ＯＣワンダラーズ":"OCワンダラーズ","東京科学大":"東京科学大","八王子市立石川中学校":"八王子市立石川中学校","Ｏ－ＬＯＶＥＲＳ":"O-Lovers","ＶＡＬＤＩ　ＳＯＦＩＡ":"VALDI Sofia","ＯＬＯＶＥＲＳ":"OLovers","智隊":"智隊","ろくさんぽ":"ろくさんぽ","スカイフィッシュ":"スカイフィッシュ","ときわ":"ときわ","山梨県":"山梨県","横浜ОＬクラブ":"横浜ОLクラブ","ＭＫＴＲＩＰ":"MKTRIP","不由径":"不由径","かがやけ山口":"かがやけ山口","滋賀県オリエンテーリング協会":"滋賀県オリエンテーリング協会","安曇野市":"安曇野市","國立東華大學":"國立東華大學","金門縣立金寧國民中小學":"金門縣立金寧國民中小學","強強滾出力":"強強滾出力","新潟市西区":"新潟市西区","南行徳で走る会":"南行徳で走る会","兵庫県神戸市":"兵庫県神戸市","ＥＳ":"ES","敬太":"敬太","とれっく":"とれっく","航空大学校":"航空大学校","鈴木塾":"鈴木塾","抹茶":"抹茶","信州大学":"信州大学","関西配車":"関西配車","福島野遊":"福島野遊","ＬＯＮＤＯＮ　ＯＫ":"London OK","鯖街道ＯＬＣ":"鯖街道OLC","東北農林専門職大学":"東北農林専門職大学","Ｏ－ＬＯＶＥＲＳ　ＫＯＲＥＡ":"O-Lovers Korea","後走ＯＬＫ":"後走OLK","ＰＡＫＳＩ　ＳＰＯＲＴＥＧＹＥＳＵＬＥＴ":"Paksi Sportegyesulet","ＯＲＩＥＮＴＥＥＲＩＮＧ　ＴＡＲＺＯ":"Orienteering Tarzo","ＳＶ　ＩＨＷ　ＡＬＥＸ　７８　ＢＥＲＬＩＮ":"SV IHW Alex 78 Berlin","ＬＡＮＧＨＵＮＤＲＡ　ＩＦ":"Langhundra IF","ＰＡＬＫＡＮＥＥＮ　ＬＵＪＡ　ＬＵＫＫＯ":"Palkaneen Luja Lukko","ＮＯ　ＣＬＵＢ　ＭＥＭＢＥＲＳＨＩＰ":"No club membership","ＯＬＧ　ＺＵＲＩＣＨ":"OLG Zurich","ＣＯＣ　ＣＬＵＢＥ　ＤＥ　ＯＲＩＥＮＴＡＣＡＯ　ＤＯ　ＣＥＮ":"COC Clube de Orientacao do Cen","ＯＲＩＥＮＴＡＣＮＩ　ＢＥＨ　ＯＰＡＶＡ":"Orientacni Beh Opava","ＬＹＮＸ":"Lynx","ＯＣ　ＦＵＥＲＳＴＥＮＦＥＬＤ":"OC Fuerstenfeld","ＹＬＩＶＩＥＳＫＡＮ　ＫＵＵＬＡ":"Ylivieskan Kuula","ＳＫＯＢ　ＺＬＩＮ":"SKOB Zlin","ＣＯ　ＣＥＲＮ":"CO CERN","ＳＡＡＲＩＪＡＲＶＥＮ　ＰＵＬＬＩＳＴＵＳ":"Saarijarven Pullistus","ＣＡＳＣＡＤＥ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"Cascade Orienteering Club","ＬＡＲＶＩＫ　ＯＫ":"Larvik OK","ＣＯＲＮＷＡＬＬ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"Cornwall Orienteering Club","ＯＫ　ＫＯＭＰＡＳＳＥＮ":"OK Kompassen","ＨＥＤＲＵＭ　ＯＬ":"Hedrum OL","ＦＲＯＳＴＡ　ＯＫ":"Frosta OK","ＦＲＯＬＵＮＤＡ　ＯＬ":"Frolunda OL","ＳＴＡＧ":"STAG","ＫＯＢＲＡ　ＢＲＡＴＩＳＬＡＶＡ":"KOBRA Bratislava","ＦＡＲＵＭＴＩＳＶＩＬＤＥ　ＯＫ":"FarumTisvilde OK","ＳＫＡＮＥＳＬＡＴＴＥＮＳ　ＯＬ":"Skaneslattens OL","ＥＮＥＢＹＢＥＲＧＳ　ＩＦ":"Enebybergs IF","ＯＢ　ＨＡＶＩＲＯＶ":"OB Havirov","こぶし花園保育園":"こぶし花園保育園","ＯＬ　ＲＥＧＩＯ　ＷＩＬ":"OL Regio Wil","ラッセル隊":"ラッセル隊","戸田市立戸田中学校":"戸田市立戸田中学校","そうだいおーしー":"そうだいおーしー","ＲＵＯＬＣ　ＯＢ":"RUOLC OB","稲毛区":"稲毛区","チームくま":"チームくま","プランナー":"プランナー","ぞんび～ず":"ぞんび～ず","アルパでオメガ":"アルパでオメガ","広島県ＯＬ協会":"広島県OL協会","鳥取県庁ロゲイニング部":"鳥取県庁ロゲイニング部","スキーＯ周南":"スキーO周南","千葉ＯＬＣ":"千葉OLC","スキーＯ":"スキーO","ＦＯＲＥＳＴＥＲ":"Forester","ＯＬＣサンスーシ":"OLCサンスーシ","ＯＢ":"OB","ＳＷＯＣ":"SWOC","ＭＯＸＩＮＡＯＫ":"MoxinaOK","多摩オリエンタル法律事務所":"多摩オリエンタル法律事務所","祝！博士号取得":"祝！博士号取得","下野市ＯＬＣ":"下野市OLC","金大":"金大","十日町市":"十日町市","十文字学園女子大学オリエンテーリング部":"十文字学園女子大学オリエンテーリング部","宝塚市立美座小学校":"宝塚市立美座小学校","ＯＡＣ":"OAC","ＳＣＣ":"SCC","みきんこ":"みきんこ","チーム同級生":"チーム同級生","とれっくＢＡＢ":"とれっくBAB","チーム遠足":"チーム遠足","ご近所さん":"ご近所さん","ゆきちえ":"ゆきちえ","みつもり":"みつもり","いばらキッス":"いばらキッス","ももくり":"ももくり","にゃんこＲ．Ｃ．":"にゃんこＲ．Ｃ．","おおやまこやま":"おおやまこやま","らくらん":"らくらん","放課後トレイル部":"放課後トレイル部","中村家":"中村家","多治見市":"多治見市","みたけランニングクラブ":"みたけランニングクラブ","ＨＡＰＰＹ　ＳＰＯＲＴＳ":"Happy Sports","金沢工業大学ＯＴＣ":"金沢工業大学OTC","大阪府":"大阪府","大阪市":"大阪市","かつお":"かつお","山梨・甲斐駒倶楽部":"山梨・甲斐駒倶楽部","芎林鄉公所":"芎林鄉公所","ＳＬＯＷ　ＡＦＴＥＲＮＯＯＮ":"Slow Afternoon","今天心情還不錯":"今天心情還不錯","齊心無畏懼":"齊心無畏懼","弱智":"弱智","第一棒塊陶阿":"第一棒塊陶阿","金珊老絜":"金珊老絜","一隻麋鹿":"一隻麋鹿","貧食カレーの会":"貧食カレーの会","金沢大学大学院":"金沢大学大学院","東北大学大学院":"東北大学大学院","緑外会":"緑外会","ＴＥＡＭ":"TEAM","南足柄ＯＬ部":"南足柄OL部","半田中学校":"半田中学校","阿久比高校":"阿久比高校","東京湾アクアライン":"東京湾アクアライン","練馬ＯＬＣ３軍":"練馬OLC3軍","ＳＳティア":"SSティア","練馬横浜超異色コンビ":"練馬横浜超異色コンビ","オールウェイズ":"オールウェイズ","い":"い","科学大インドアＯ選抜":"科学大インドアO選抜","純米吟醸":"純米吟醸","Ｔ．":"T.","千葉大学教育学部":"千葉大学教育学部","チーム山中":"チーム山中","↑ガチャでＳＳＲを外す":"↑ガチャでSSRを外す","たしろ":"たしろ","海畑ＯＬＫ":"海畑OLK","佐賀秋田連合軍":"佐賀秋田連合軍","千葉大学かけっこ学部":"千葉大学かけっこ学部","ＳＩＣ２０２６日本代表":"SIC2026日本代表","飛鳥":"飛鳥","広島市":"広島市","実践女子":"実践女子","丸田一門":"丸田一門","十文字女子大学":"十文字女子大学","駿台予備校":"駿台予備校","無敵の会":"無敵の会","ＡＲＤＦ":"ARDF","ＪＡＰＡＮ　ＭＴＢＯ　ＭＡＳＴＥＲ　Ｔ":"JAPAN MTBO master T","入間市オリエンテーリングクラブ":"入間市オリエンテーリングクラブ","京大ＯＧ":"京大OG","ほうじ茶エース":"ほうじ茶エース","阿不就好棒棒":"阿不就好棒棒","ＪＯＥ安心":"Joe安心","鈴敏ＧＯＧＯ！":"鈴敏Gogo!","泰格ＵＰＰＥＲＣＵＴ":"泰格Uppercut","拜六的暗時":"拜六的暗時","新婚快樂":"新婚快樂","取這什麼名字看不懂啦":"取這什麼名字看不懂啦","ＬＹＣＪ":"LYCJ","沖繩苦瓜好好吃":"沖繩苦瓜好好吃","慢慢跑比較快":"慢慢跑比較快","梧桐樹":"梧桐樹","コダック":"コダック","我們愛阿弟":"我們愛阿弟","瓜呱蝸呱":"瓜呱蝸呱","ＯＷＬ":"OWL","宇野派":"宇野派","東北ＯＬＣ":"東北olc","静岡県立大学":"静岡県立大学","茨大":"茨大","中央大学":"中央大学","少年リレー運営班":"少年リレー運営班","川越・大阪連合":"川越・大阪連合","金沢・長野連合":"金沢・長野連合","明日香村立聖徳中学校":"明日香村立聖徳中学校","須坂上高井駅伝部":"須坂上高井駅伝部","ＨＯＬＣ":"HOLC","村岡高校":"村岡高校","ＢＳ養父１団　ＢＶＳ・ＣＳ隊":"BS養父1団 BVS・CS隊","後走":"後走","杜":"杜","特茶":"特茶","中央大学附属高等学校ＷＩＬＤＬＩＦＭＩＮＩＲＭＩＮＩＲＡＣＥ＿ＡＣＥ＿Ｅ":"中央大学附属高等学校wildlifMiniRMiniRace_Ace_E","ＫＯＯＶＥＥ":"Koovee","ＶＡＬＭＯ":"VALMO","ＧＹＯＮＧＹＯＳＩ　ＴＡＪＦＵＴＯ　ＫＬＵＢ":"Gyongyosi Tajfuto Klub","ＯＫ　ＴＲＩＡＮ":"OK Trian","ＳＵＲＡＨＡＭＭＡＲＳ　ＳＯＫ":"Surahammars SOK","ＢＥＡＣ":"BEAC","ＭＡＡＲＥＮ　ＯＫ":"Maaren OK","ＳＶ　ＴＵＲＢＩＮＥ　ＮＥＵＢＲＡＮＤＥＮＢＵＲＧ":"SV Turbine Neubrandenburg","ＯＫ　ＮＯＭＭＥ":"OK Nomme","ＯＲＩＥＮＴＡＴＥ":"Orientate","ＫＯＮＮＥＲＵＤ　ＩＬ":"Konnerud IL","ＲＯＸＢＵＲＧＨ　ＲＥＩＶＥＲＳ":"Roxburgh Reivers","ＫＯＢ　ＣＩＮＧＯＶ　ＳＰＩＳＳＫＡ　ＮＯＶＡ　ＶＥＳ":"KOB CINGOV Spisska Nova Ves","ＳＩＬＶＡ":"Silva","ＹＬＡＮＥＥＮ　ＫＩＲＩ":"Ylaneen Kiri","ＢＥＮＤＩＧＯ　ＯＲＩＥＮＴＥＥＲＳ":"Bendigo Orienteers","ＯＯＢ　ＴＪ　ＴＡＴＲＡＮ　ＪＡＢＬＯＮＥＣ　ＮＡＤ　ＮＩＳ":"OOB TJ Tatran Jablonec nad Nis","ＶＡＬＢＯ　ＡＩＦ":"Valbo AIF","ＦＲＥＤＥＮＳＢＯＲＧ　ＯＫ":"Fredensborg OK","ＦＲＥＤＲＩＫＳＨＯＦＳ　ＩＦ　ＳＫＩＤ　ＡＮＤ　ＯＫ":"Fredrikshofs IF Skid and OK","ＳＣ　ＬＩＭＡＮ":"SC Liman","ＯＫ　ＶＩＬＳＥ":"OK Vilse","ＵＭＫＳ　ＫＷＩＤＺＹＮ":"UMKS Kwidzyn","ＯＫ　ＲＯＸＥＮ":"OK Roxen","ＩＲＵＭＡＳＨＩ　ＯＬＣ":"Irumashi OLC","ＳＯＳ　ＪＩＮＤＲＩＣＨＵＶ　ＨＲＡＤＥＣ":"SOS Jindrichuv Hradec","ＳＴＯＣＫＨＯＬＭＳ　ＯＫ":"Stockholms OK","ＡＲＳＵＮＤＡ　ＩＦ":"Arsunda IF","筑波大":"筑波大","吹田ＯＬＧ":"吹田OLG","みかわ":"みかわ","ネコチャン！ネコチャン！":"ネコチャン！ネコチャン！","関西組":"関西組","参考記録":"参考記録","おさるの会":"おさるの会","ヒューマノイド":"ヒューマノイド","ふきのとう":"ふきのとう","チーム和田":"チーム和田","県立浦和高校":"県立浦和高校","ふるはうす":"ふるはうす","前監督":"前監督","西尾市":"西尾市","つるまい":"つるまい","森を走ろう！":"森を走ろう!","一宮市":"一宮市","ＨＩＴＯＹＡＭＡ":"HITOYAMA","生物資源":"生物資源","資源":"資源","体育":"体育","社会工学":"社会工学","基礎工":"基礎工","農林":"農林","大六野一門":"大六野一門","ＷＮＧＯＬＣ":"WNGOLC","新潟薬科大学":"新潟薬科大学","長岡造形大学":"長岡造形大学","阪大":"阪大","寿会・練馬ＯＬＣ":"寿会・練馬OLC","前橋ＯＬＣ":"前橋OLC","太田市":"太田市","国府校下":"国府校下","前橋トレラン部":"前橋トレラン部","京女ＯＧ":"京女OG","うどんえんどう":"うどんえんどう","広大ＯＢ":"広大OB","京京立ＯＧ":"京京立OG","金沢大学ＯＬＣ":"金沢大学OLC","名古屋大学院":"名古屋大学院","千葉大学ＯＬＣ":"千葉大学OLC","ＳＫＩＯ合宿":"SKIO合宿","ＭＨＣＴ":"MHCT","農林走友会":"農林走友会","ＮＩＩＧＡＴＡ":"NIIGATA","神戸高等学校":"神戸高等学校","松本市立開智小学校":"松本市立開智小学校","信州大学附属松本中学校":"信州大学附属松本中学校","みちの会Ａ":"みちの会A","名大":"名大","刃牙梨":"刃牙梨","くりけも":"くりけも","あわあわラムネ":"あわあわラムネ","コタロー":"コタロー","アルパカ":"アルパカ","一升栄升":"一升栄升","大垣市":"大垣市","各務原市":"各務原市","岐阜市":"岐阜市","中津川市":"中津川市","高山市":"高山市","関市":"関市","美濃加茂市":"美濃加茂市","川重山岳会":"川重山岳会","水篶刈":"水篶刈","ナビ鍋部":"ナビ鍋部","デデデ倶楽部":"デデデ倶楽部","北摂ＡＤＶ部":"北摂ADV部","中央大附属中高":"中央大附属中高","ＹＡＯＣ－ＨＫＧ":"YAOC-HKG","野外研ヤバいけん":"野外研ヤバいけん","松江市":"松江市","東京都ひかり":"東京都ひかり","東京都のぞみ":"東京都のぞみ","愛知県オリエンテーリング協会":"愛知県オリエンテーリング協会","福島県":"福島県","福島県オリエンテーリング選手団":"福島県オリエンテーリング選手団","岩手県":"岩手県","ふぞろいのみかん":"ふぞろいのみかん","和歌山県協会チーム":"和歌山県協会チーム","チーム信長":"チーム信長","山口県":"山口県","常若三走士":"常若三走士","上州空っ風":"上州空っ風","高知県":"高知県","チーム乗鞍":"チーム乗鞍","愛媛県チーム":"愛媛県チーム","名古屋オリエンテーリング":"名古屋オリエンテーリング","越王会ＯＬＤシニア":"越王会OLDシニア","太陽の塔":"太陽の塔","ＪＤＬ":"JDL","．":".","竹科實中":"竹科實中","別藏了":"別藏了","新竹縣博愛國中":"新竹縣博愛國中","興隆國小":"興隆國小","跑Ｑ衝起來":"跑Q衝起來","華晴衝衝衝":"華晴衝衝衝","連立政権":"連立政権","岡山広島":"岡山広島","京都府Ｒ":"京都府R","しんこうまさ":"しんこうまさ","埼玉山梨":"埼玉山梨","越王会＇":"越王会'","名古屋大学大学院":"名古屋大学大学院","青葉会＇":"青葉会'","第４２回大会プランナー":"第42回大会プランナー","仙台ＯＬＣ、青葉会":"仙台OLC、青葉会","新夢":"新夢","國立陽明交通大學":"國立陽明交通大學","東華大學":"東華大學","屏東縣體育會定向越野委員會":"屏東縣體育會定向越野委員會","照海華德福":"照海華德福","奈良女子大ＯＬＣ":"奈良女子大OLC","ＴＥＡＭＦＬＡＴ♭":"TeamFlat♭","シガウマラ":"シガウマラ","桐朋":"桐朋","春日井市":"春日井市","おやまカンパニー":"おやまカンパニー","東京都荒川区":"東京都荒川区","岸和田健康クラブ":"岸和田健康クラブ","うさぎ会":"うさぎ会","和歌山市":"和歌山市","本多":"本多","愛知県名古屋市":"愛知県名古屋市","新潟県学校スキー研究会":"新潟県学校スキー研究会","ＩＳＣ":"ISC","京大院工":"京大院工","法政":"法政","順天堂":"順天堂","ＭＨ":"MH","ＩＳ":"IS","こんにゃい":"こんにゃい","岡山県倉敷市":"岡山県倉敷市","ＭＴＢＯ":"MTBO","東海高校":"東海高校","ＨＯＫＵＲＩＫＵ　ＤＯＲＯＴＡＢＯＵ":"HOKURIKU DOROTABOU","大阪農学校":"大阪農学校","岐阜県ＯＬ協会":"岐阜県OL協会","玉露がいいな":"玉露がいいな","坪居ライン":"坪居ライン","深川寮":"深川寮","都給他棒起來":"都給他棒起來","東京科学大学大学院":"東京科学大学大学院","空色レコード":"空色レコード","養父市":"養父市","ＫＹＤＣ":"KYDC","わせだだいがく":"わせだだいがく","ＵＫＳ　ＯＲＩＥＮＴＰＡＲＫ　ＩＷＩＮＹ":"UKS Orientpark Iwiny","ＳＰＯＲＴＩＳＯＬＡ　ＬＡ　ＭＡＤＤＡＬＥＮＡ　ＡＳＤ":"SPORTISOLA LA MADDALENA ASD","ＶＳＴＪ　ＥＫＯＮＯＭ　ＰＲＡＨＡ":"VSTJ Ekonom Praha","ＭＡＬＵＮＧＳ　ＯＫ　ＳＫＯＧＳＭＡＲＤＡＲＮＡ":"Malungs OK Skogsmardarna","ＴＲＡＮＳＣＡＲＰＡＴＨＩＡ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＦＥ":"Transcarpathia Orienteering Fe","ＨＯＮＧ　ＫＯＮＧ　ＩＳＬＡＮＤ　ＯＲＩＥＮＴＥＥＲＩＮＧ":"Hong Kong Island Orienteering","ＨＡＲＬＥＱＵＩＮＳ":"Harlequins","ＴＳＫ　ＧＵＣＵ　ＳＫ":"TSK Gucu SK","ＵＫＳ　ＯＳＩＲ　ＧＯＲＡ　ＫＡＬＷＡＲＩＡ":"UKS OSiR Gora Kalwaria","ＫＢ　ＭＡＮＩＡＣ　ＰＯＺＮＡＮ":"KB MANIAC Poznan","ＲＡＳＴＩＨＡＵＫＡＴ":"Rastihaukat","ＵＫＲＡＩＮＩＡＮ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＦＥＤＥＲＡＴ":"Ukrainian Orienteering Federat","ＧＴＭＡＰＳ":"GTmaps","ＯＲＩＥＮＴＥＥＲＩＮＧ　ＡＲＧＥＮＴＩＮＡ":"Orienteering Argentina","ＯＴＰ　ＧＥＡ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＡＳＤ　ＡＰＳ":"OTP GEA ORIENTEERING ASD APS","ＢＥＭＯＷＯ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＴＥＡＭ":"Bemowo Orienteering Team","ＵＮＩＶＥＲＳＩＤＡＤ　ＤＥ　ＡＬＩＣＡＮＴＥ":"UNIVERSIDAD DE ALICANTE","ＫＯＢ　ＤＯＢＲＵＳＫＡ":"KOB Dobruska","ＢＩＢＢＵＬＭＵＮ　ＯＲＩＥＮＴＥＥＲＳ":"Bibbulmun Orienteers","ＺＥＬＥＳＴＡ":"ZELESTA","ＪＡＰＡＮＥＳＥ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＦＥＤＥＲＡＴＩ":"Japanese Orienteering Federati","ＯＫ　ＡＺＵＯＬＡＳ":"OK Azuolas","ＳＯＯＢ　ＳＰＡＲＴＡＫ　ＲＹＣＨＮＯＶ　ＮＡＤ　ＫＮＥＺＮ":"SOOB Spartak Rychnov nad Knezn","ＫＶＳ　ＳＵＭＰＥＲＫ":"KVS Sumperk","ＴＪ　ＴＺ　ＴＲＩＮＥＣ":"TJ TZ Trinec","ＴＥＡＭ　ＪＩＺＥＲＫＹ":"Team Jizerky","ＩＮＯＭＡＮＩＡＫ　ＮＯＷＡ　ＤＥＢＡ":"InOManiak Nowa Deba","ＭＩＫＡＷＡ　ＯＬＣ":"Mikawa OLC","ＢＡＣＫＷＯＯＤＳ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＫＬＵＢ":"Backwoods Orienteering Klub","ＡＧＵＩＬＡＳ　Ｏ":"AGUILAS O","ＡＤＯＬ":"ADOL","ＳＯＵＴＨ　ＹＯＲＫＳＨＩＲＥ　ＯＲＩＥＮＴＥＥＲＳ":"South Yorkshire Orienteers","ＴＥＡＭ　３６０　ＳＴＯＰＮＩ　１７　ＷＩＥＬＫＯＰＯＬＳＫ":"Team 360 Stopni 17 Wielkopolsk","ＯＫ　ＲＡＶＩＮＥＮ":"OK Ravinen","ＡＭＩＧＯＳ　ＤＡ　ＭＯＮＴＡＮＨＡ":"Amigos da Montanha","ＵＫＳ　ＲＥＦＬＥＸ　ＲＹＢＮＩＫ":"UKS Reflex Rybnik","ＳＫ　ＰＲＡＧＡ　ＰＲＡＨＡ":"SK Praga Praha","ＯＲＩＥＮＴＡＣＩＪＳＫＩ　ＫＬＵＢ　ＫＯＭＥＮＤＡ":"Orientacijski klub Komenda","ＣＳ　ＳＰＲＩＡ　ＢＡＩＡ　ＳＰＲＩＥ":"CS SPRIA Baia Sprie","ＰＯＬＩＣＥ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"Police Orienteering Club","ＯＮＹＸ":"Onyx","ＯＲ　ＳＷＡＬＬＯＷＳ　ＮＯＡＬＥ":"Or Swallows Noale","ＮＳＡ　ＳＩＶＥＮ":"NSA Siven","ＫＳＴＯ　ＺＥＮＩＴ":"KSTO Zenit","ＷＹＤＲＹ　ＧＡＬＩＣＪＡ":"Wydry Galicja","ＤＯＷＮＴＯＷＮ　６５　ＥＮＤＵＲＡＮＣＥ":"Downtown 65 Endurance","ＳＡＣＡ　ＴＲＩＬＨＯＳ　ＡＮＡＤＩＡ":"Saca Trilhos Anadia","ＯＫ　ＰＥＲＫＵＮＡＳ":"OK Perkunas","ＮＯＮＥ":"NONE","ＴＯＬＥＲＥＤＵＴＢＹ　ＯＬ":"ToleredUtby OL","ＳＶ　ＲＯＢＯＴＲＯＮ　ＤＲＥＳＤＥＮ":"SV Robotron Dresden","ＳＵＮＤＳＶＡＬＬＳ　ＯＫ":"Sundsvalls OK","ＩＳＲ　ＯＣ　ＴＥＬ　ＡＶＩＶ":"ISR OC TEL AVIV","ＤＲＥＰＴＡＫ　ＫＲＯＳＮＯ":"Dreptak Krosno","ＯＬＶ　ＰＯＴＳＤＡＭ":"OLV Potsdam","ＩＨＲ":"IHR","ＯＲＩＥＮＴＡＣＩＪＳＫＩ　ＫＬＵＢ　ＡＺＩＭＵＴ":"Orientacijski klub Azimut","ＹＡＲＲＡ　ＶＡＬＬＥＹ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"Yarra Valley Orienteering Club","ＯＬＧ　ＲＥＧＥＮＳＢＵＲＧ":"OLG Regensburg","ＰＴＴＫ　ＫＲＯＳＮＯ":"PTTK Krosno","ＯＬＣ　ＳＫＯＧ　ＦＲＩＢＯＵＲＧ":"OLC Skog Fribourg","ＮＩＶＡＬＡＮ　ＳＵＵＮＮＩＳＴＡＪＡＴ":"Nivalan Suunnistajat","ＪＭＤ　ＪＡＳＺＡＰＡＴＩ":"JMD Jaszapati","ＴＳＧ　ＢＡＤ　ＫＯＥＮＩＧ":"TSG Bad Koenig","ＯＳＣ　ＨＡＭＢＵＲＧ":"OSC Hamburg","ＢＥＴＡ　ＵＲＳＵＳ　ＲＯＳＩＣＥ":"BETA Ursus Rosice","ＣＩＴＹ　ＯＦ　ＴＲＥＥＳ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵ":"City of Trees Orienteering Clu","ＫＡＷＡＧＯＥ　ＯＬＣ":"Kawagoe OLC","ＡＴＴＵＮＤＡ　ＯＫ":"Attunda OK","ＡＡＳ　ＮＭＢＵ　ＯＲＩＥＮＴＥＲＩＮＧ":"Aas NMBU Orientering","ＮＡＳＳＪＯ　ＯＫ":"Nassjo OK","ＳＺＥＫＥＳＦＥＨＥＲＶＡＲ":"Szekesfehervar","ＨＵＤＳＯＮ　ＶＡＬＬＥＹ　ＯＲＩＥＮＴＥＥＲＩＮＧ":"Hudson Valley Orienteering","ＢＯＸＨＯＬＭ　ＭＪＯＬＢＹ　ＯＬ":"Boxholm Mjolby OL","ＯＫ　ＳＫＡＲＭＥＮ":"OK Skarmen","ＬＯＴＥＮ　ＯＬ":"Loten OL","ＯＫ　ＫＬＥＭＭＩＮＧＥＮ":"OK Klemmingen","ＩＳＲ　ＯＣ　ＬＥＶ　ＨＡＳＨＡＲＯＮ　ＭＥＮＡＳＨＥ":"ISR OC Lev Hasharon Menashe","ＷＡＮＤＥＲＥＲＳ":"Wanderers","ＭＡＮＴＳＡＬＡＮ　ＵＲＨＥＩＬＩＪＡＴ":"Mantsalan Urheilijat","ＣＬＵＢ　ＵＫＲＡＩＮＥ":"Club Ukraine","ＶＡＮＧ　ＯＲＩＥＮＴＥＲＩＮＧＳＫＬＵＢＢ":"Vang Orienteringsklubb","ＯＲＩ　ＥＳＴＡＲＲＥＪＡ":"Ori Estarreja","ＴＡＫＡＳＡＫＩ　ＯＬＣ":"Takasaki OLC","ＲＡＳＴＩＫＡＲＨＵＴ":"Rastikarhut","ＳＺＡＲＯＴＫＩ　ＲＺＥＳＺＯＷ":"Szarotki Rzeszow","ＫＡＵＶＡＴＳＡＮ　ＰＯＮＴＥＶＡ":"Kauvatsan Ponteva","ＢＡＤＯ":"BADO","ＢＪＵＲＳＡＳ　ＯＫ":"Bjursas OK","ＴＶ　ＯＢＥＲＫＩＲＣＨ":"TV Oberkirch","ＯＫ　ＯＤＭＡＲＤＥＮ":"OK ODMARDEN","ＴＪ　ＳＬＡＶＩＡ　ＥＫＯＮＯＭ　ＢＡＮＳＫＡ　ＢＹＳＴＲＩ":"TJ Slavia Ekonom Banska Bystri","ＲＡＭＢＬＥＲＳ　ＯＣ":"Ramblers OC","ＫＤＺ　ＬＹＳＡ　ＮＡＤ　ＬＡＢＥＭ":"KDZ Lysa nad Labem","ＯＹＥＳＴＡＤ　ＩＦ":"Oyestad IF","．ＣＯＭ":".COM","ＫＥＩＹＯ　ＯＬ":"Keiyo OL","ＳＯＧＮＤＡＬ　ＩＬ":"Sogndal IL","ＬＹＮＧＢＹ　ＯＫ":"Lyngby OK","ＯＬＣ　ＧＲＡＺ":"OLC Graz","ＢＡＹ　ＡＲＥＡ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"Bay Area Orienteering Club","ＯＡＯＲＩＥＮＴ":"OAorient","ＯＬＫ　ＡＲＧＵＳ":"OLK Argus","ＢＯＣ":"BOC","ＯＫ　ＮＡＣＫＨＥ":"OK Nackhe","ＰＡＲＡＷＡＮＧＡ　ＯＲＩＥＮＴＥＥＲＳ":"Parawanga Orienteers","ＯＫ　ＯＳＴ":"OK Ost","ＨＵＤＩＫＳＶＡＬＬＳ　ＯＫ":"Hudiksvalls OK","ＭＡＬＡＲＯ　ＳＯＫ":"Malaro SOK","ＳＵＯＮＥＮＪＯＥＮ　ＶＡＳＡＭＡ":"Suonenjoen Vasama","ＯＢ　ＫＵＮＶＡＬＤ":"OB Kunvald","ＭＡＲＩＡＧＥＲＦＪＯＲＤ　ＯＫ":"Mariagerfjord OK","ＳＵＮＤＢＹＢＥＲＧＳ　ＩＫ":"Sundbybergs IK","ＷＥＳＳＥＸ":"Wessex","ＳＡＴＥＲＢＹＧＤＥＮＳ　ＯＫ":"Saterbygdens OK","ＧＵＩＬＤＦＯＲＤ　ＯＲＩＥＮＴＥＥＲＳ":"Guildford Orienteers","ＢＩＧ　ＦＯＯＴ　ＯＲＩＥＮＴＥＥＲＳ":"Big Foot Orienteers","ＯＣＴＡＶＩＡＮ　ＤＲＯＯＢＥＲＳ":"Octavian Droobers","ＨＡＳＳＬＥＨＯＬＭＳ　ＯＫ":"Hassleholms OK","ＬＯＳＴ":"LOST","ＩＦＫ　ＧＯＴＥＢＯＲＧ":"IFK Goteborg","ＯＫ　ＧＩＰＥＮ":"OK Gipen","ＧＯＬＤＳＥＥＫＥＲＳ　ＯＲＩＥＮＴＥＥＲＳ":"Goldseekers Orienteers","ＨＡＵＨＯＮ　ＳＩＳＵ":"Hauhon Sisu","ＢＡＲＡＮＹＡ　ＴＥＡＭ":"Baranya Team","ＩＦ　ＢＲＡＨＥ":"IF Brahe","ＯＫ　ＳＩＬＶＡ　ＣＡＭＰＩＮＡ":"OK SILVA CAMPINA","ＫＡＮＧＡＳＮＩＥＭＥＮ　ＫＡＬＳＫＥ":"Kangasniemen Kalske","ＤＯＭＮＡＲＶＥＴＳ　ＧＯＩＦ":"Domnarvets GoIF","ＣＯＡＬＡ":"COALA","ＴＵＲＥＮＧＩＮ　ＳＡＲＡＳＴＵＳ":"Turengin Sarastus","ＭＥＲＩＤＩＡＮＳ　ＯＫ":"Meridians OK","ＯＯＢ　ＡＳ":"OOB As","ＯＬＧ　ＢＡＳＥＬ":"OLG Basel","ＫＹＯＴＯ　ＯＬＣ":"Kyoto OLC","ＨＳＶ　ＨＯＥＲＳＣＨＩＮＧ":"HSV Hoersching","ＩＴＡ　ＰＡＩＪＡＮＴＥＥＮ　ＲＡＳＴＩ":"Ita Paijanteen rasti","ＯＬＧ　ＲＹＭＥＮＺＢＵＲＧ":"OLG Rymenzburg","ＭＯＲＡＶＩＡＮ":"Moravian","ＯＫ　ＴＩＳＡＲＥＮ":"OK Tisaren","ＢＯＤＯ　ＯＧ　ＯＭＥＧＮ　ＩＦ　ＯＲＩＥＮＴＥＲＩＮＧ":"Bodo og omegn IF Orientering","ＺＯＬＤ　ＳＰＯＲＴＯＫ　ＣＬＵＢＪＡ":"Zold Sportok Clubja","ＪＡＲＶＥＮＰＡＡＮ　ＰＡＬＯ":"Jarvenpaan Palo","ＬＥＩＢＮＩＴＺＥＲ　ＡＣ":"Leibnitzer AC","ＫＡＮＮＵＫＳＥＮ　ＵＲＡ":"Kannuksen Ura","ＳＫ　ＭＥＴＥＯＲ　ＫＡＣＥＲＯＶ":"SK Meteor Kacerov","ＩＫ　ＷＩＬＳＫＥ":"IK Wilske","ＫＡＴＲＩＮＥＨＯＬＭＳ　ＯＫ":"Katrineholms OK","ＰＩＴＡＪＡＮＭＡＥＮ　ＴＡＲＭＯ":"Pitajanmaen Tarmo","ＴＯＣＫＡＲＰＳ　ＩＫ":"Tockarps IK","ＬＵＤＶＩＫＡ　ＯＫ":"Ludvika OK","ＦＫ　ＧＯＩＮＧＡＲＮＡ":"FK Goingarna","ＥＩＤＳＫＯＧ　ＯＬ":"Eidskog OL","ＩＬＬＡＷＡＲＲＡ　ＫＡＲＥＥＬＡＨ　ＯＲＩＥＮＴＥＥＲＳ":"Illawarra Kareelah Orienteers","ＫＳＯ　ＢＵＫＯＶＹＮＡ":"KSO Bukovyna","ＯＰＡ　ＭＯＮＴＩＧＮＹ":"OPA Montigny","ＳＵＵＮＴＡ　ＳＥＰＯＴ":"Suunta Sepot","ＪＵＶＡＮ　ＵＲＨＥＩＬＩＪＡＴ":"Juvan Urheilijat","ＥＳＶ　ＬＯＫ　ＳＣＨＯＥＮＥＷＥＩＤＥ　ＢＥＲＬＩＮ":"ESV Lok Schoeneweide Berlin","ＴＪ　ＺＬＡＴＥ　ＨＯＲＹ":"TJ Zlate Hory","ＡＮＤＲＡＲＵＭＳ　ＩＦ":"Andrarums IF","ＡＳＫＯＹ　ＯＬ":"Askoy OL","ＧＲＡＮＮＡＢＹＧＤＥＮＳ　ＯＫ":"GrannaBygdens OK","ＡＳＫＶＯＬＬ　ＯＧ　ＨＯＬＭＥＤＡＬ　ＩＬ":"Askvoll og Holmedal IL","ＨＡＵＫＩＰＵＴＡＡＮ　ＨＥＩＴＴＯ":"Haukiputaan Heitto","ＧＡＲＩＮＧＡＬ　ＯＲＩＥＮＴＥＥＲＳ":"Garingal Orienteers","ＩＫ　ＦＡＬＫＥＮ":"IK Falken","ＩＫ　ＶＩＳＴＡ":"IK Vista","ＲＡＳＴＩ　ＬＵＫＫＯ":"Rasti Lukko","ＲＩＩＨＩＭＡＥＮ　ＳＵＵＮＮＩＳＴＡＪＡＴ":"Riihimaen Suunnistajat","ＨＡＭＯＫ":"hamok","ＰＩＩＫＫＩＯＮ　ＫＥＨＩＴＹＳ":"Piikkion Kehitys","ＮＡＶＩ　ＳＥＮＪＯＲ":"Navi senjor","ＮＩＴＴＥＤＡＬ　ＯＬ":"Nittedal OL","ＨＩＳＯＹ　ＯＫ":"Hisoy OK","ＦＡＲＵＭ　ＯＫ":"Farum OK","ＳＡＬＯＩＳＴＥＮ　ＲＥＩＰＡＳ":"Saloisten Reipas","ＢＯＴＮＥ　ＳＫ":"Botne SK","ＯＤＥＮＳＥ　ＯＲＩＥＮＴＥＲＩＮＧＳＫＬＵＢ":"Odense Orienteringsklub","ＯＫ　ＴＹＬＯＳＫＯＧ":"OK Tyloskog","ＵＤＤＥＶＡＬＬＡ　ＩＳ":"Uddevalla IS","ＩＰＲ":"IPR","ＳＰＯＲＴＣＥＮＴＲＵＭ　ＪＩＣＩＮ":"Sportcentrum Jicin","ＲＩＭＢＯ　ＳＯＫ":"Rimbo SOK","ＨＡＲＬＯＶＳ　ＩＦ":"Harlovs IF","ＰＥＮＤＬＥ　ＦＯＲＥＳＴ　ＯＲＩＥＮＴＥＥＲＳ":"Pendle Forest Orienteers","ＷＲＯＣＬＡＷ":"wroclaw","ＡＬＢＡＮＹ　ＡＮＤ　ＤＥＮＭＡＲＫ　ＨＩＮＴＥＲＬＡＮＤ":"Albany and Denmark Hinterland","ＯＯＢ　ＴＲＥＢＩＣ":"OOB Trebic","ＴＩＲＡＳ　ＯＲＩＥＮＴ":"Tiras Orient","ＹＯＵＴＨ　ＡＤＶＡＮＣＥ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵ":"Youth Advance Orienteering Clu","ＳＡＩＮＴ　ＢＲＩＥＵＣ　ＯＲＩＥＮＴＡＴＩＯＮ":"Saint Brieuc Orientation","ＯＬＡＩＮＥ":"Olaine","ＫＡＭＮＩＳＫＩ　ＯＲＩＥＮＴＡＣＩＪＳＫＩ　ＫＬＵＢ":"KAMNISKI ORIENTACIJSKI KLUB","ＯＣ　ＬＥＶＵＯ":"OC Levuo","ＫＨＥＲＳＯＮ":"Kherson","ＵＭＡＲＡ　ＳＰＯＲＴＳ　ＣＬＵＢ":"Umara Sports Club","ＭＡＴＦＹＺ　ＰＲＡＨＡ":"Matfyz Praha","ＯＢ　ＤＤＭ　ＫＯＳＴＥＬＥＣ　ＮＡＤ　ＯＲＬＩＣＩ":"OB DDM Kostelec nad Orlici","ＩＳＴＡＮＢＵＬ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＳＰＯＲ　ＫＵＬ":"Istanbul Orienteering Spor Kul","ＴＳＶ　ＪＥＴＺＥＮＤＯＲＦ":"TSV Jetzendorf","ＥＡＳＴ　ＬＯＴＨＩＡＮ　ＯＲＩＥＮＴＥＥＲＳ":"East Lothian Orienteers","ＵＫＲＡＩＮＩＡＮ　ＯＲＩＥＮＴＥＥＲＩＮＧ":"Ukrainian orienteering","ＯＫ　ＨＥＤＳＴＲＯＭＭＥＮ":"OK Hedstrommen","ＣＬＵＢ　ＡＪＡＲＩ":"Club Ajari","ＯＫ　ＴＲＩＡＮＧＥＬＮ":"OK Triangeln","ＢＡＬＩＳＥ":"Balise","ＳＥＧＥＲＳＴＡ　ＯＫ":"Segersta OK","ＣＯＭＰＡＳ":"COMPAS","ＦＡＧＥＲＳＴＡ　ＯＫ":"Fagersta OK","ＰＡＲＧＡＳ　ＩＦ":"Pargas IF","ＯＸＹＧＥＮ":"Oxygen","ＨＳＶ　ＯＬ　ＷＩＥＮＥＲ　ＮＥＵＳＴＡＤＴ":"HSV OL Wiener Neustadt","ＭＯＬＮＤＡＬ　ＯＵＴＤＯＯＲ　ＩＦ":"Molndal Outdoor IF","ＴＨＵＲＧＯＲＩＥＮＴＡ":"thurgorienta","ＤＥＥＳＩＤＥ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"Deeside Orienteering Club","ＲＡＳＴＩＩＭＩ":"RasTiimi","ＣＯＢＦ":"COBF","ＳＣ　ＡＣＨＭＥＲ":"SC Achmer","ＯＫ　ＯＫＡＳ":"OK Okas","ＯＫ　ＬＥＨＯＬＡ":"OK Lehola","ＵＳＣ　ＭＡＧＤＥＢＵＲＧ":"USC Magdeburg","ＢＲＥＤＡＲＥＤＳ　ＩＦ":"Bredareds IF","ＭＡＲＩＢＯ　ＯＫ":"Maribo OK","ＢＯＮＯ":"BONO","ＨＯＮＶＥＤ　ＢＯＴＴＹＡＮ　ＮＹＩＲＥＧＹＨＡＺＡ":"Honved Bottyan Nyiregyhaza","ＡＵＳＴＲＡＬＯＰＥＲＳ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"Australopers Orienteering Club","ＯＳ　ＩＬ":"OS IL","ＯＫ　ＯＲＶＡＮＤ":"OK Orvand","ＫＲＡＭＦＯＲＳＡＬＬＩＡＮＳＥＮ":"Kramforsalliansen","ＫＯＢ　ＳＯＫＯＬ　ＰＥＺＩＮＯＫ":"KOB Sokol Pezinok","ＲＯＹＫＥＮ　ＯＬ":"Royken OL","ＫＲＯＫＳＴＡＤＯＥＲＡ　ＩＬ":"Krokstadoera IL","ＡＮＫＡＲＡ　ＧＳＭ":"ANKARA GSM","ＩＬ　ＨＡＵＫＥＮ":"IL Hauken","ＢＲＡＴＩＳＬＡＶＡ":"Bratislava","ＲＡＳＴＩＲＥＴＫＩ":"Rastiretki","ＲＡＳＴＩＪＵＳＳＩＴ":"RastiJussit","ＧＵＳＴＡＶＳＢＥＲＧＳ　ＯＫ":"Gustavsbergs OK","ＯＫ　ＴＯＲＦＩＮＮ":"OK Torfinn","ＩＦ　ＳＴＵＲＬＡ":"IF Sturla","ＤＲ　ＫＲＡＳＴＳ":"DR Krasts","ＯＫ　ＳＫＯＧＳＦＡＬＫＥＮ":"OK Skogsfalken","ＨＪＯＢＹＧＤＥＮＳ　ＯＫ":"Hjobygdens OK","ＩＫ　ＵＶＥＮ":"IK Uven","ＬＥＲＵＭＳ　ＳＯＫ":"Lerums SOK","ＯＵＮＡＳＶＡＡＲＡＮ　ＨＩＩＨＴＯＳＥＵＲＡ":"Ounasvaaran Hiihtoseura","ＪＯＮＫＯＰＩＮＧＳ　ＯＫ":"Jonkopings OK","ＯＫ　ＬＵＳ":"OK LUS","ＳＴＡＢＡＥＫ　ＩＦ":"Stabaek IF","ＲＯＣＫＹ　ＭＯＵＮＴＡＩＮ　ＯＣ":"Rocky Mountain OC","ＢＥＲＧＥＲ　ＯＧ　ＳＶＥＬＶＩＫ　ＯＬ":"Berger og Svelvik OL","ＴＶ　ＪＡＨＮ　ＷＯＬＦＳＢＵＲＧ":"TV Jahn Wolfsburg","ＲＯＮＤ　ＯＬ":"Rond OL","ＯＫ　ＴＲＡＮＡＮ":"OK Tranan","ＫＡＲＪＡＡＮ　ＵＲＡ":"Karjaan Ura","ＡＫＥＲＳ　ＩＦ":"Akers IF","ＩＬ　ＫＯＬＬ":"IL Koll","ＫＬＵＢ　ＧＯＲＯＤ　ＭＵＥＮＣＨＥＮ":"Klub GOROD Muenchen","谷川　友太":"谷川　友太","加藤　遼":"加藤　遼","森河　俊成":"森河　俊成","藤澤　達也":"藤澤　達也","池　陽平":"池　陽平","溝端　昭子":"溝端　昭子","前川　一彦":"前川　一彦","勝田　治":"勝田　治","鈴木　夕希子":"鈴木　夕希子","大阪大学法学部":"大阪大学法学部","関西同期":"関西同期","関学幹事":"関学幹事","ＮＭＴＴ":"NMTT","青葉区ＯＬＣ":"青葉区OLC","清水屋":"清水屋","胸ガジンジンのインチョン将軍":"胸ガジンジンのインチョン将軍","当日参加":"当日参加","スタートだけプロ":"スタートだけプロ","さいたま市浦和区領家選抜":"さいたま市浦和区領家選抜","ＫＯＬＣ三世代":"KOLC三世代","つばめ会レジェンド":"つばめ会レジェンド","暇です！行きます！":"暇です！行きます！","討伐おじさん選抜":"討伐おじさん選抜","第８次長谷川内閣":"第8次長谷川内閣","つばめ会みどじゅん":"つばめ会みどじゅん","打倒古谷一門":"打倒古谷一門","ＵＨＯ":"UHO","フエちゃんず":"フエちゃんず","まだまだ東工大":"まだまだ東工大","工芸ブッチ界隈":"工芸ブッチ界隈","ＤＩＳＱメン":"DISQメン","転生したら平井だった堅":"転生したら平井だった堅","パンツ葉加瀬太郎":"パンツ葉加瀬太郎","三間飛車":"三間飛車","ヴァリューズ":"ヴァリューズ","ＯＢ１年目の意地":"OB1年目の意地","ぱんだとえいたとぱんだ":"ぱんだとえいたとぱんだ","ノム－＞ウツ－＞ハシル":"ノム->ウツ->ハシル","ケームケームクンパッツと愉快な仲間たち":"ケームケームクンパッツと愉快な仲間たち","古谷一門":"古谷一門","弓ヶ浜テレイン化評議会":"弓ヶ浜テレイン化評議会","ゴールだけプロ":"ゴールだけプロ","山本家":"山本家","ひとりじゃないよ":"ひとりじゃないよ","征服おじさん選抜":"征服おじさん選抜","陸上部選抜":"陸上部選抜","朝霞ＯＬＣ":"朝霞OLC","クリサカくん６世":"クリサカくん6世","雄":"雄","ＴＴＭＴ":"TTMT","ランボーズ":"ランボーズ","ＧＯＴＥＢＯＲＧ－ＭＡＪＯＲＮＡ　ＯＫ":"Goteborg-Majorna OK","ＡＮＥＫＤＯＴＡ":"Anekdota","厚木大学ＯＬＣ":"厚木大学OLC","高松山グルグルクラブ":"高松山グルグルクラブ","ＯＬＣサン・スーシ":"OLCサン・スーシ","ＯＬＣレオ新人":"OLCレオ新人","すいたん":"すいたん","神戸大学オリエンテーリング部":"神戸大学オリエンテーリング部","静岡大学オリエンテーリング部":"静岡大学オリエンテーリング部","ＳＯＤＥＲＳ　ＴＹＲＥＳＯ":"Soders Tyreso","立命弁天ＯＬＣ":"立命弁天OLC","茨城大学オリエンテーリング":"茨城大学オリエンテーリング","山葡萄ＯＬＣ":"山葡萄OLC","さる年会":"さる年会","一風会":"一風会","会津工業高校":"会津工業高校","チームうずら":"チームうずら","神戸大学大学院":"神戸大学大学院","伊勢志摩ＯＬＣ":"伊勢志摩OLC","羅針盤緑外会":"羅針盤緑外会","真備ＯＬＣ":"真備OLC","北九州ＯＬ協会":"北九州OL協会","下今市の住民":"下今市の住民","ＹＡＯＣ－ＨＫ":"YAOC-HK","厚見中学校":"厚見中学校","すみすみ椎茸":"すみすみ椎茸","銭湯態勢♨":"銭湯態勢♨","京都大学工学部建築学科":"京都大学工学部建築学科","浦和高":"浦和高","桐朋中":"桐朋中","きたいちしょくどう":"きたいちしょくどう","人文":"人文","芸術":"芸術","比文":"比文","工シス":"工シス","情報":"情報","筑波大学山下研":"筑波大学山下研","蒼穹クラブ":"蒼穹クラブ","つくばＲＯＣ":"つくばROC","茨城県協会第２支部":"茨城県協会第2支部","ＫＯＬＣ・相模女子大学":"KOLC・相模女子大学","名岐ベンド":"名岐ベンド","福山市":"福山市","山口県周南市":"山口県周南市","ＯＣ寿会":"OC寿会","ＫＹＯＴＯ　ＵＮＩＶＥＲＳＩＴＹ":"Kyoto University","コースプランナー":"コースプランナー","部室の民":"部室の民","畑田ＦＣ":"畑田FC","杉並区民":"杉並区民","ＥＡのクラスメイト":"EAのクラスメイト","えねか":"えねか","奈良女子大":"奈良女子大","京女":"京女","阪神奈ＯＢ":"阪神奈OB","荒屋校下":"荒屋校下","台灣魔神":"台灣魔神","名大コーチ":"名大コーチ","参考":"参考","ＲＯＬＣ":"ROLC","越王会長岡支部":"越王会長岡支部","ヤチホニウム":"ヤチホニウム","ＯＬＫ３５ＴＨ":"OLK35th","鉄緑会":"鉄緑会","ＦＬＹＩＮＧＢＡＢＹ":"Flyingbaby","ＴＥＡＭ　ＳＡＴＳＵＫＩ":"Team Satsuki","ＭＡＲＩ　ＣＯ．":"MARI Co.","第七コンピュータリソース":"第七コンピュータリソース","くのいち":"くのいち","前前プランナー":"前前プランナー","冒険中毒　ＩＧ＠ＢＯＫＥＮＣＨＵＤＯＫＵ":"冒険中毒 ig@bokenchudoku","山形大学":"山形大学","東京農業大学":"東京農業大学","越王会シニア":"越王会シニア","新大":"新大","サンコンズ":"サンコンズ","ＯＣΔ下野":"OCΔ下野","ＴＥＲＲＡＸ　ＳＰＯＲＴＳ":"TerraX Sports","ＤＥＥＲ－Ｏ　ＣＨＩＮＡ":"Deer-O China","ＥＳＩＵ":"ESIU","ＴＥＡＭ　ＦＵＬＬ　ＣＨＡＮＣＥ！！":"Team Full Chance!!","こんたま":"こんたま","スコ亀":"スコ亀","ナヒーラ・ナヒーラ":"ナヒーラ・ナヒーラ","ＧＷ":"GW","ＣＰ　ＳＥＥＫＥＲＳ":"CP Seekers","あやなほトラバース":"あやなほトラバース","どーちよ":"どーちよ","ホンアツ飲兵衛":"ホンアツ飲兵衛","ＡＹ":"AY","クライマークライマー":"クライマークライマー","ＴＥＡＭ　ＫＡＺＵ":"Team Kazu","ＴＥＣ＿":"TEC_","チーム十六夜":"チーム十六夜","団菊":"団菊","シノブ＆ゴー":"シノブ&ゴー","ＦＭ":"fm","オールドマウス":"オールドマウス","ＴＥＡＭはてかい":"teamはてかい","チームだいごまる":"チームだいごまる","同行二匹":"同行二匹","丹沢で再会":"丹沢で再会","ちーたー":"ちーたー","オールドパー":"オールドパー","湖のクジラ":"湖のクジラ","ロストアンドゴー":"ロストアンドゴー","ＴＡＣ＿ＭＴ":"TAC_MT","生い茂った杉":"生い茂った杉","朝霧迷走中年団":"朝霧迷走中年団","チーム雷鳥":"チーム雷鳥","チームみなみ":"チームみなみ","カバ倶楽部":"カバ倶楽部","地図読み初心者Ｘ":"地図読み初心者X","ＴＥＣ＿４番":"TEC_4番","もちもち同盟":"もちもち同盟","ＡＹＡちゃん":"AYAちゃん","ＭＷ":"MW","チャレンジ":"チャレンジ","泉北高速女子":"泉北高速女子","ちゃーさんズ":"ちゃーさんズ","ゴキゲンハイカー":"ゴキゲンハイカー","アベオ":"アベオ","美濃加茂山岳会":"美濃加茂山岳会","関山岳会":"関山岳会","芦屋市":"芦屋市","シマエナガＯＬＣ":"シマエナガOLC","北大ＦＣ":"北大FC","札幌農学校永遠の幸":"札幌農学校永遠の幸","小金井公園走友会":"小金井公園走友会","蓮華寺池ＯＬＫ":"蓮華寺池OLK","ＣＬＵＢ阿闍梨、ＯＬＣサン・スーシ":"Club阿闍梨、OLCサン・スーシ","道局":"道局","ＢＥ　Αオス":"Be αオス","ＰＡＰＯ":"PAPO","神戸えーしー":"神戸えーしー","にょ":"にょ","ツルタ海賊団":"ツルタ海賊団","ＯＲＩＥＮＴＥＥＲＩＮＧＳＧ":"OrienteeringSG","ＷＩＬＤＥＳ　ＫＡＭＵＹ":"WILDES KAMUY","金沢ＯＬＫ":"金沢ＯＬＫ","ＫＹＯＴＯ－Ｕ":"kyoto-u","とまと":"とまと","金大ＯＬＣ４０期選抜":"金大OLC40期選抜","金大ＯＢ＿カックマズ":"金大OB_カックマズ","ゼーハーズ":"ゼーハーズ","金大ＯＬＣ＿関西支部Ａ":"金大OLC_関西支部A","メロンパンアイス":"メロンパンアイス","福井消防":"福井消防","富山ＯＬＫ":"富山OLK","ざわざわ":"ざわざわ","ＯＬＣ不由径Ｂ":"OLC不由径Ｂ","小松市ＯＬ協会":"小松市OL協会","ＯＬＣ不由径Ａ":"OLC不由径Ａ","愛知県":"愛知県","川崎市":"川崎市","静岡県":"静岡県","和歌山県":"和歌山県","三重県":"三重県","群馬県":"群馬県","チーム長良川":"チーム長良川","ＴＲやまびこ":"TRやまびこ","こま":"こま","ＡＳＨ":"ASH","母と息子":"母と息子","おらっち井川ラン":"おらっち井川ラン","ＭＡＲＫ":"MARK","ナマケモノビーバー":"ナマケモノビーバー","三保海浜マラソン":"三保海浜マラソン","浜松郵便局":"浜松郵便局","くてくて":"くてくて","なべぞとだいちゃん":"なべぞとだいちゃん","チームふなち":"チームふなち","浦高ＯＢ保護者":"浦高OB保護者","ＨＯＬＫ":"HOLK","ちいむもみじ":"ちいむもみじ","東京聽奧培訓隊":"東京聽奧培訓隊","中華民國聽障奧運代表隊":"中華民國聽障奧運代表隊","台中市定向越野推廣協會":"台中市定向越野推廣協會","水忠弱智":"水忠弱智","ＦＯＲＭＯＳＡ　ＲＯＧＡＩＮＩＮＧ":"Formosa Rogaining","陽明交通大學":"陽明交通大學","聽障定向越野合作計畫隊":"聽障定向越野合作計畫隊","嘎波波翻跟斗斗":"嘎波波翻跟斗斗","莊文豪":"莊文豪","臺北醫學大學":"臺北醫學大學","國立臺北商業大學":"國立臺北商業大學","嘎波波翻跟抖抖":"嘎波波翻跟抖抖","無":"無","香檳隊":"香檳隊","太學":"太學","新竹縣定向越野代表隊":"新竹縣定向越野代表隊","國立臺南大學":"國立臺南大學","東海大學":"東海大學","陽明交大附中":"陽明交大附中","新竹市立建功高中":"新竹市立建功高中","新竹縣東興國中":"新竹縣東興國中","培英國中":"培英國中","賴家小老虎":"賴家小老虎","金陵女中":"金陵女中","臺中市立中港高級中學":"臺中市立中港高級中學","台中市五權國中":"台中市五權國中","新竹縣仁愛國中":"新竹縣仁愛國中","女子宿舍":"女子宿舍","山蘇小隊":"山蘇小隊","復興國小":"復興國小","新竹康橋國小":"新竹康橋國小","ＨＵＡＮＧＢＲＯ":"HuangBro","徐龍犬隊":"徐龍犬隊","原創":"原創","新竹縣興隆國小":"新竹縣興隆國小","新竹定向家族":"新竹定向家族","鯊鯊突擊隊":"鯊鯊突擊隊","埼玉県協会":"埼玉県協会","滋賀県":"滋賀県","ＳＵＵＮＴＡ　ＪＵＲＶＡ":"Suunta Jurva","ここまでセレ落ち":"ここまでセレ落ち","福島県オリエンテーリング協会":"福島県オリエンテーリング協会","植栄":"植栄","伊達":"伊達","凹たれん隊":"凹たれん隊","ＪＯＹＦＩＴ平岡":"JOYFIT平岡","池上学園":"池上学園","ＣＭＣ郡山支部":"CMC郡山支部","げんちゃんハウス":"げんちゃんハウス","謝家冒險隊":"謝家冒險隊","彰化定向越野委員會":"彰化定向越野委員會","照海":"照海","嘉義玉山":"嘉義玉山","朱雀オリエンテーリングクラブ":"朱雀オリエンテーリングクラブ","ＯＬＯ兵庫":"OLO兵庫","神戸大学市民工学専攻":"神戸大学市民工学専攻","岡崎市":"岡崎市","半田小学校":"半田小学校","大阪市立焼野小学校４期生":"大阪市立焼野小学校4期生","ＩＳＯＣ　ＯＢ":"ISOC OB","駄菓子屋ルート":"駄菓子屋ルート","麻布学園":"麻布学園","ビール飲み隊":"ビール飲み隊","すさみ町":"すさみ町","白浜町":"白浜町","みなべ町":"みなべ町","茨大ＯＬＤ＿ＯＢ":"茨大OLD_OB","ＯＬＣほのくに":"OLCほのくに","三原市":"三原市","日野市":"日野市","高知市":"高知市","入間市ＯＬＫ":"入間市OLK","冨山さんのピアノがまた聴きたい":"冨山さんのピアノがまた聴きたい","平山さん大好きクラブ":"平山さん大好きクラブ","前哨戦":"前哨戦","ＫＳＤＣ":"KSDC","きんぴらＯＬＣ":"きんぴらOLC","ＡＲＤＦ新潟":"ＡＲＤＦ新潟","ウィダー":"ウィダー","石原一門":"石原一門","ＫＴＣ　すみすみ椎茸":"KTC すみすみ椎茸","お嬢部":"お嬢部","前作ＥＡ":"前作EA","晴れの国　岡山":"晴れの国 岡山","ＣＬＵＢＧＩＲＯ":"clubGIRO","ＥＳＣ吉谷":"ESC吉谷","ヱビスヤスポーツ":"ヱビスヤスポーツ","ＯＣＡＤ":"OCAD","ＫＡＺ":"KAZ","横国":"横国","ホリイ":"ホリイ","明治":"明治","捻挫ＯＬＣ":"捻挫OLC","ＩＳＦＪＯＲＤＥＮ　ＩＬ":"Isfjorden Il","ＦＦＣ":"FFC","ＨＴ":"HT","安走会":"安走会","かぼちゃ":"かぼちゃ","ＶＩＲＧＡ":"Virga","チーム鳩ぽっぽ":"チーム鳩ぽっぽ","神戸大学オリエンテーリングクラブ":"神戸大学オリエンテーリングクラブ","ＡＫＡＳＨＩ":"AKASHI","台湾魔神仔":"台湾魔神仔","桐嶺会、":"桐嶺会、","中大附属中学校ＷＩＬＤＬＩＦＥ":"中大附属中学校WILDLIFE","中央大学附属中学校　ＷＩＬＤＬＩＦＥ":"中央大学附属中学校 WILDLIFE","ひつじ年おひつじ座":"ひつじ年おひつじ座","ＯＬＣルーパー・":"OLCルーパー・","アークスキー":"アークスキー","ファミリ－ＯＬＣ":"ファミリ-OLC","桐朋高校":"桐朋高校","ＴＥＡＭ　ＧＲＭ":"TEAM GRM","コースセッター":"コースセッター","ＯＮＯ練":"ONO練","久実子":"久実子","ズッコケ三人組":"ズッコケ三人組","東京大学大学大学院":"東京大学大学大学院","龍谷大ＯＬＣ　ＯＢ":"龍谷大OLC OB","熊本とれっく":"熊本とれっく","千葉県鎌ケ谷市":"千葉県鎌ケ谷市","若宮幼稚園":"若宮幼稚園","ＯＫＰ":"OKP","筑波大学・ときわ走林会":"筑波大学・ときわ走林会","スーパー読図クラブ":"スーパー読図クラブ","ＯＬＣほわほわ":"OLCほわほわ","Ａ　ＣＬＵＳＴＥＲ":"A cluster","富山県":"富山県","目指せ玉露":"目指せ玉露","まだまだ煎茶":"まだまだ煎茶","チームがみポン":"チームがみポン","ＦＵＪＩ　ＷＩＮＤ":"FUJI WIND","ＩＳＯＣ－ＯＢ":"ISOC-OB","神戸大ＯＬＫ":"神戸大OLK","チームまなじい":"チームまなじい","ボーイスカウト京都７団":"ボーイスカウト京都７団","西尾校下":"西尾校下","我們都是拖油瓶":"我們都是拖油瓶","杏友会｜トータス":"杏友会|トータス","滋賀大学　広島ＯＬＣ":"滋賀大学　広島OLC","お茶の水大学":"お茶の水大学","朝来市":"朝来市","前走ＯＬＫ":"前走OLK","琵琶湖ＯＬＣ":"琵琶湖OLC","もいもい":"もいもい","杜飲み接続":"杜飲み接続","目指せ煎茶":"目指せ煎茶","玉露ルーキー":"玉露ルーキー","幹事":"幹事","監督":"監督","ほうじ茶":"ほうじ茶","ここまで通過":"ここまで通過","ＭＩＮＩＲＭＩＮＩＲＡＣＥ＿ＡＣＥ＿ＥＳ関東Ｃ":"MiniRMiniRace_Ace_ES関東C","ＶＡＲＳＫＡ　ＯＫ　ＰＥＫＯ":"Varska OK Peko","ＡＳ　ＩＧＮ":"AS IGN","ＨＩＩＵＭＡＡ　ＯＫ":"Hiiumaa OK","ＫＳ　ＢＡＲＡＫＵＤＡ　ＭＩＮＳＫ　ＭＡＺＯＷＩＥＣＫＩ":"KS Barakuda Minsk Mazowiecki","ＵＫＳ　ＫＯＭＥＴＡ　ＧＬＩＷＩＣＥ":"UKS Kometa Gliwice","ＳＫ　ＯＢ　ＯＳＴＲＡＶＡ":"SK OB Ostrava","ＡＬＣＯＲ　ＥＸ":"ALCOR EX","ＨＩＭＡＮＧＡＮ　ＵＲＨＥＩＬＩＪＡＴ":"Himangan Urheilijat","ＣＬＥＶＥＬＡＮＤ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＫＬＵＢ":"Cleveland Orienteering Klub","ＫＯＢ　ＡＬＦＡ　ＢＲＮＯ":"KOB ALFA Brno","ＡＬＣＯＲ":"ALCOR","ＫＵＵＳＡＮＫＯＳＫＥＮ　ＵＲＨＥＩＬＵＳＥＵＲＡ":"Kuusankosken Urheiluseura","ＶＩＬＮＩＵＳ　ＤＥＡＦ　ＳＰＯＲＴＳ　ＣＬＵＢ　ＧＥＳＴＡ":"Vilnius Deaf Sports Club GESTA","ＣＯＭＩＢ":"COMIB","�ＧＯＣＺＡＬＫＯＷＩＣＥ　ＺＤ":"�Goczalkowice Zd","ＯＬＶ　ＵＳＬＡＲ":"OLV Uslar","ＨＡＬＭＳＴＡＤ　ＯＫ":"Halmstad OK","ＥＡＳＴ　ＰＥＮＮＩＮＥ　ＯＲＩＥＮＴＥＥＲＩＮＧ　ＣＬＵＢ":"East Pennine Orienteering Club","ＭＬＡＤＯＳＴ　ＢＬＡＧＯＥＶＧＲＡＤ":"Mladost Blagoevgrad","ＲＯＣＨＡ　ＣＬＵＢＥ　ＤＥ　ＯＲＩＥＮＴＡＣＡＯ":"ROCHA Clube de Orientacao","ＩＳＴＲＯＳ　ＲＵＳＥ":"Istros Ruse","ＣＳ　ＵＮＩＲＥＡ　ＡＬＢＡ　ＩＵＬＩＡ":"CS Unirea Alba Iulia","ＳＶ　ＭＯＥＬＴＥＮ　ＲＡＩＦＦＥＩＳＥＮ":"SV Moelten Raiffeisen","ＣＳ　ＭＥＴＲＯＰＯＬＩＴＡＮ　ＢＵＣＵＲＥＳＴＩ":"CS Metropolitan Bucuresti","ＢＥＲＫＯＶＩＴＳＡ":"Berkovitsa","ＫＹＳＵＣＫＥ　ＮＯＶＥ　ＭＥＳＴＯ":"Kysucke Nove Mesto","ＰＵＲＶＡ　ＢＲＩＤＥＪＳ":"Purva Bridejs","ＴＡＢＡＮＩ　ＳＰＡＲＴＡＣＵＳ　ＳＫＥ":"Tabani Spartacus SKE","ＫＵ　ＡＺＳ　ＰＯＬＩＴＥＣＨＮＩＫＡ　ＷＡＲＳＺＡＷＳＫＡ":"KU AZS Politechnika Warszawska","ＢＥＧＵＮ":"BEGUN","ＴＥＲＬＡＮＥＲ　ＯＲＩＥＮＴＩＥＲＵＮＧＳＬＡＥＵＦＥＲ":"Terlaner Orientierungslaeufer","ＯＵＬＡＩＳＴＥＮ　ＨＵＩＭＡ":"Oulaisten Huima","ＯＫ　ＮＯＬＡＳＫＯＧＳＡＲＮＡ":"OK Nolaskogsarna","ＡＡＬ":"AAL","ＨＩＤＥＧＫＵＴＩ　ＳＰＡＲＴＡＣＵＳ":"Hidegkuti Spartacus","ＮＡＳＴＯＬＡＮ　ＴＥＲＡ":"Nastolan Tera","�ＴＩＳＴＥＤ":"�Tisted","ＯＫ　ＲＡＫＯＶＮＩＫ":"OK Rakovnik","ＢＡＥＫＫＥＬＡＧＥＴＳ　ＳＫ":"Baekkelagets SK","ＫＡＤＥ　ＯＫ":"Kade OK","ＳＫＩＥＲＮＩＥＷＩＣＫＩＥ　ＳＴＯＷＡＲＺＹＳＺＥＮＩＥ":"Skierniewickie Stowarzyszenie","ＣＨＩＧＷＥＬＬ　ＡＮＤ　ＥＰＰＩＮＧ　ＦＯＲＥＳＴ　ＯＲＩ":"Chigwell and Epping Forest Ori","ＶＡＣＡＮＴ　ＶＡＣＡＮＴ":"Vacant Vacant","ＣＬＵＢＬＥＳＳ":"Clubless","ＩＳＲ　ＯＣ　ＨＥＶＥＬ　ＭＯＤＩＩＮ":"ISR OC Hevel Modiin","ＦＪＡＲＡＳ　ＡＩＫ":"Fjaras aik","�ＳＷＯＣ�ＩＲＬ�ＩＲＬ�":"�SWOC�IRL�IRL�","ＬＩＮＤＥＢＹＧＤＥＮＳ　ＯＫ":"Lindebygdens OK","穂の国":"穂の国","名城大学":"名城大学","中嶋　啓太":"中嶋　啓太","たなわふ":"たなわふ","ＣＵＴ　ＯＦＦ":"CUT OFF","とれっくＤ":"とれっくD","ＣＰ　ＳＥＥＫＥＲＳ　Β":"CP Seekers β","コナ・ウィン":"コナ・ウィン","ＫＩＴＡ":"kita","名草倶楽部":"名草倶楽部","ＢＯＫＫＥＲＳ　　ＳＷ":"BOKKERS  SW","ちーむとりけも":"ちーむとりけも","ホンアツのんべえ":"ホンアツのんべえ","みやま":"みやま","ともえもん":"ともえもん","ＹＡＭＡＹＡ":"yamaya","アシスト走行会別班":"アシスト走行会別班","そめちゃんち":"そめちゃんち","チームＨ＆Ａ":"チームH&A","ノブニョーン":"ノブニョーン","もりの":"もりの","ゆきみ大福":"ゆきみ大福","ＴＥＡＭ　はてかい":"team はてかい","大山だいすきズ":"大山だいすきズ","きよじゅん珍道中":"きよじゅん珍道中","ちーむのみけも":"ちーむのみけも","ちーむだいごまる":"ちーむだいごまる","伊藤夫婦":"伊藤夫婦","ＰＡＳＡＰＡＳＡ":"PASaPASA","ＥＭＭＡＲＳ":"EMMARS","ぬのまる":"ぬのまる","ＡＹＡＣ":"AYAC","ゆでたん":"ゆでたん","まるかわのぼる":"まるかわのぼる","ビッグストーン":"ビッグストーン","ＭＭ":"MM","ハンター協会":"ハンター協会","留寿都ＯＣ":"留寿都OC","行けたら行くわＯＬＣ":"行けたら行くわOLC","札幌農学校シンガポール支部":"札幌農学校シンガポール支部","筑波大学オリエン部":"筑波大学オリエン部","チーム最弱王":"チーム最弱王","伊庭八景":"伊庭八景","早稲田大学オリエンテーリングクラブ":"早稲田大学オリエンテーリングクラブ","小松市木場町":"小松市木場町","おしゃがみ等":"おしゃがみ等","千葉オリエンテーリングクラブ":"千葉オリエンテーリングクラブ","屋敷一門":"屋敷一門","杉中一門":"杉中一門","エイド全力隊":"エイド全力隊","ＧＯ７８　ＧＵＹＡＮＣＯＵＲＴ":"GO78 Guyancourt","ＣＨＩＮＥＳＥ　　ＴＡＩＰＥＩ":"CHINESE  TAIPEI","ＩＳＧＯ":"Isgo","台灣魔神仔":"台灣魔神仔","徳島県オリエンテーリング協会":"徳島県オリエンテーリング協会","東京オリエンテーリングクラブ":"東京オリエンテーリングクラブ","東北大ＯＬＣ部":"東北大OLC部","龍谷オリエンテーリングクラブ":"龍谷オリエンテーリングクラブ","静岡県立":"静岡県立","大泉":"大泉","京大ＯＢ":"京大OB","ＧＥＲＭＡＮＹ":"Germany","岩手・風になるＥＳＴ":"岩手・風になるEST","中央大学附属高等学ＷＩＬＤＬＩＦＥ":"中央大学附属高等学WILDLIFE","沼津アルプス・トレイルズ":"沼津アルプス・トレイルズ","チーム水車町":"チーム水車町","ノースＴＣＨ":"ノースTCH","北上ＯＬ協会":"北上OL協会","ＰＥＮＤＬＥ　ＦＯＲＥＳＴ　ＯＲＩＥＮＴＥＥＲＳ　－　ＵＫ":"PENDLE FOREST ORIENTEERS - UK","大阪大学ＯＬＣ":"大阪大学OLC","幕張の民":"幕張の民","友達にカッコつけたい":"友達にカッコつけたい","Ｃ阿闍梨":"C阿闍梨","Ｏ－ＳＵＰＰＯＲＴ":"O-Support","とれいるざんまい":"とれいるざんまい","ＡＳＫ－":"ASK-","まなべ療育センター":"まなべ療育センター","クラブＳＩＸ":"クラブSIX","ＴＥＡＭＮ":"TeamN","奈良女子大学オリエンテーリング部":"奈良女子大学オリエンテーリング部","広島ＯＬ協会":"広島OL協会","さくら組うさぎチーム":"さくら組うさぎチーム","さくら組カピパラチーム":"さくら組カピパラチーム","ぎょうざ":"ぎょうざ","京都大学ＯＬＣ":"京都大学OLC","ＲＵＯＬＣ":"RUOLC","ＲＵＯＬＣ　ＯＧ":"RUOLC OG","阪大大学院新人":"阪大大学院新人","青波走行会":"青波走行会","ＮＯＴ大阪ＯＬＣ":"not大阪OLC","ＯＳＡＫＡ　ＵＮＩＶＥＲＳＩＴＹ":"Osaka University","再走":"再走","名コントローラー":"名コントローラー","ＤＡＩＮＡＳＯ":"dainaso","迷プランナー":"迷プランナー","新歓委員長":"新歓委員長","ハイＴ":"ハイT","高塚一門":"高塚一門","恐竜いっぱいいたなぁ":"恐竜いっぱいいたなぁ","登れないです、、、":"登れないです、、、","千葉大ＯＢ":"千葉大OB","飲み会の王者":"飲み会の王者","磨くっちゃ漢＠東北大ＯＬＣ":"磨くっちゃ漢@東北大OLC","臺灣":"臺灣","ＵＲＡＹＡＭＡ　ＯＬＣ":"URAYAMA OLC","出雲ＫＴＣ":"出雲KTC","大阪ＯＬＣＯＬＣ":"大阪OLCOLC","ＭＡＬＭＯＥ　ＯＫ":"Malmoe OK","稲沢市":"稲沢市","岩瀬家":"岩瀬家","みやぁ～ず＆Ｔ":"みやぁ～ず&T","グレイシア":"グレイシア","ルカリオ":"ルカリオ","どらいぶ":"どらいぶ","多田一孝":"多田一孝","ＴＥＡＭ　とびいり":"Team とびいり","広島大附属福山高ＯＢ":"広島大附属福山高OB","県庁ロゲイニング部":"県庁ロゲイニング部","鷲見家":"鷲見家","ＷＯＣ代表":"WOC代表","国際":"国際","医学":"医学","応用理工":"応用理工","応理":"応理","医療科学":"医療科学","教育":"教育","自然学類":"自然学類","顧問":"顧問","日日":"日日","社会工学類":"社会工学類","社会":"社会","看護":"看護","ＡＡＣ":"AAC","早大":"早大","日大":"日大","筑波大学ヤバい研":"筑波大学ヤバい研","ＢＥＡＮＳ":"beans","貪食カレーの会":"貪食カレーの会","大社町":"大社町","低山舐めるな":"低山舐めるな","低山なめるな":"低山なめるな","東広島市":"東広島市","ＥＭＥＫ　ＹＩＺＲＡＥＬ　Ｏ　ＣＬＵＢ":"Emek Yizrael O Club","念願のロングセレ通過へ":"念願のロングセレ通過へ","運営責任者":"運営責任者","前奏":"前奏","長岡市":"長岡市","桐生市":"桐生市","五泉市":"五泉市","小千谷市":"小千谷市","八千代市":"八千代市","中之条町":"中之条町","高崎市":"高崎市","千葉県協会":"千葉県協会","関東オリエンティア競馬部":"関東オリエンティア競馬部","ＩＮＤＯＯＲ　Ｏ　ＥＮＴＨＵＳＩＡＳＴＳ":"Indoor O enthusiasts","千葉ＯＳＫ":"千葉OSK","桂工科大ＯＬＣ":"桂工科大OLC","弥富市":"弥富市","ちゃぶＲＵＮ":"ちゃぶRUN","ＥＫクラブ":"EKクラブ","留年ＯＬＣ":"留年OLC","宮城学院":"宮城学院","ＣＣＣ郡山支部":"CCC郡山支部","むねちゃんず":"むねちゃんず","阪神奈ＯＧ":"阪神奈OG","福井県坂井市":"福井県坂井市","金工大ＯＴＣ":"金工大OTC","符津校下":"符津校下","台湾魔人":"台湾魔人","東海中学":"東海中学","名大ＯＬＣ":"名大OLC","高岡市":"高岡市","富山市":"富山市","てけてけ":"てけてけ","村松ＯＬＣ":"村松OLC","立命ＯＧ":"立命OG","ＨＯＫＡＩＤＡＯＵＤＡＩＧＡＫＵ":"HOKAIDAOUDAIGAKU","ＩＣＵＯＬＫ":"ICUOLK","越王会静岡ＯＬＣ":"越王会静岡ＯＬＣ","シュプールスキークラブ":"シュプールスキークラブ","長野ＯＬＣ":"長野OLC","十文字ＯＧ":"十文字OG","綾野・マイケルサモエドロトシゲス・拓全":"綾野・マイケルサモエドロトシゲス・拓全","鶴舞ＯＬＣ":"鶴舞OLC","文雅定向":"文雅定向","新竹縣竹東鎮":"新竹縣竹東鎮","ＲＡＹ":"Ray","葉家豪":"葉家豪","鐘振瑋跑去哪":"鐘振瑋跑去哪","笛笛谷谷":"笛笛谷谷","李宗學":"李宗學","它些京悠喵":"它些京悠喵","‍":"‍","聽障定向越野培訓隊":"聽障定向越野培訓隊","我是誰我在哪":"我是誰我在哪","駭龍鐵人":"駭龍鐵人","陳文田":"陳文田","小魚好":"小魚好","爸爸想單飛":"爸爸想單飛","耍廢老母":"耍廢老母","詹凱心":"詹凱心","阿鳥喂":"阿鳥喂","京都女子大学・":"京都女子大学・","ＮＩＳＨＩＰＲＯ":"NishiPRO","及川一門":"及川一門","美濃部家":"美濃部家","及川一門一門長":"及川一門一門長","ＯＬＫ４６ＴＨ":"OLK46th","京都ＯＬＣ東海紅萌会京大":"京都OLC東海紅萌会京大","村越ゼミ":"村越ゼミ","東海中高":"東海中高","青葉の森だいすきクラブ":"青葉の森だいすきクラブ","同期運営応援隊":"同期運営応援隊","セッター":"セッター","早稲文中退":"早稲文中退","☆わ☆せ☆だ☆":"☆わ☆せ☆だ☆","やまぼうし":"やまぼうし","になけし":"になけし","カレンソウ":"カレンソウ","ちーむゆはら":"ちーむゆはら","るーむ":"るーむ","ＯＬＯＶＥＲＳ　ＫＯＲＥＡ":"OLovers Korea","名椙４３期　三河ＯＬＣ":"名椙43期　三河OLC","ＡＹＡ　＆　ＢＵＣＨＩ":"Aya ＆ Buchi","飛騨山岳会":"飛騨山岳会","日本山岳会":"日本山岳会","大垣":"大垣","岐阜やまびこ":"岐阜やまびこ","中津川":"中津川","当日行かないＯＬＣ":"当日行かないOLC","元道局":"元道局","ＣＡＳＣＡＤＥ　ＯＲＩＥＮＴＥＥＲＩＮＧ":"Cascade Orienteering","デカデカＯＬＣ":"デカデカOLC","札幌厳誠館":"札幌厳誠館","ほやほやＯＬＣ":"ほやほやOLC","ＯＬＣほかほか":"OLCほかほか","ＮＯＴ　ＬＯＮＧ　Ｂ４　Ｉ　ＫＮＯＷ":"not long b4 I know","京大ＯＬＣ－ＯＢ":"京大OLC-OB","緑桜会":"緑桜会","立命ＯＬＣ＿ＯＢ":"立命OLC_OB","太陽が丘ＪＣ":"太陽が丘JC","京大理学部":"京大理学部","滋賀県協会":"滋賀県協会","ＲＯＬＡ－ＯＧ":"ROLA-OG","鮒亀大学ＯＬＣ":"鮒亀大学OLC","丘の上浦高ぎんなん会":"丘の上浦高ぎんなん会","桐朋オリエンテーリング部":"桐朋オリエンテーリング部","愛知県立半田高等学校":"愛知県立半田高等学校","脱埼玉":"脱埼玉","デュオトリア":"デュオトリア","ＨＫＦＯＣ":"HKFOC","ちゃんぷ練ＴＲＣ":"ちゃんぷ練TRC","ＭＥＬ　ＦＯＲＥＳＴ　ＲＡＣＥＲＳ":"MEL Forest Racers","福島県ＯＬ協会":"福島県ＯＬ協会","ＬＶＯ":"LVO","アイスの会":"アイスの会","なめてんじゃねぇ":"なめてんじゃねぇ","チームＫＡＷＡＷＡ":"チームkawawa","かわせみ":"かわせみ","台灣魔神ＭＯＸＩＮＡＯＫ":"台灣魔神MoxinaOK","ザビエル虎次郎":"ザビエル虎次郎","岡山県協会":"岡山県協会","富山県高岡市":"富山県高岡市","かほくＯＬＣ":"かほくＯＬＣ","第１２回大会実長":"第12回大会実長","丘の上札幌支所":"丘の上札幌支所","ゆるふわ":"ゆるふわ","ゴジラＯＬＣ":"ゴジラOLC","品川区":"品川区","ＯＣ　ＴＩＡＮＡ":"OC Tiana","ＯＬＣフランス":"OLCフランス","上原　圭太郎":"上原 圭太郎","冨田　大智":"冨田 大智","土屋　祐太朗":"土屋 祐太朗","河原　昇一":"河原 昇一","ＯＬＰ　兵庫":"OLP 兵庫","福岡市":"福岡市","チームかんちゃん":"チームかんちゃん","徳島県":"徳島県","札幌無能学校":"札幌無能学校","ソロペア②":"ソロペア②","ＹＣＣ":"YCC","ＨＳＳ":"HSS","サハラ":"サハラ","ＣＨＵＴＯＥＮ":"CHUTOEN","ＡＢＥＴＲＡ":"ABETRA","ベンチ＆プレス":"ベンチ&プレス","靴紐はぎゅっとね":"靴紐はぎゅっとね","サムタイムランナーズ":"サムタイムランナーズ","静岡ガスＲＣ":"静岡ガスRC","たぬとてん":"たぬとてん","チームつばさ":"チームつばさ","ＡＬＰ　ＳＫＩ　ＴＥＡＭ":"ALP SKI TEAM","やさぐれ":"やさぐれ","ＫＡＲＨＵ　ＲＵＮＮＩＮＧ　ＴＥＡＭ":"KARHU RUNNING TEAM","チームゲッコー":"チームゲッコー","全力満喫中！お先にどうぞ～":"全力満喫中！お先にどうぞ～","メディカル":"メディカル","酒呑みランナーズ　下戸組":"酒呑みランナーズ　下戸組","おしとやか":"おしとやか","お任せします！":"お任せします！","凸凹とれいるず":"凸凹とれいるず","チーム初老":"チーム初老","ベラトリクス":"ベラトリクス","ちゃんばー":"ちゃんばー","ＯＫＢ":"OKB","わんわんズ":"わんわんズ","チーム茶臼小屋":"チーム茶臼小屋","石川めおと山業":"石川めおと山業","ひが家":"ひが家","ケツカッチン":"ケツカッチン","Ｋ☆Ｕ":"K☆U","ＹＥＳ　ＷＥ　ＣＡＮ":"YES WE CAN","ソロペア①":"ソロペア①","チーム高木さん":"チーム高木さん","ＭＭＹ":"MMY","ＳＭＩＬＥＹ":"smiley","チームゆるラン":"チームゆるラン","チームメイ":"チームメイ","爆笑走":"爆笑走","なおあさ登山部":"なおあさ登山部","ふかざわ":"ふかざわ","チームまきの家":"チームまきの家","ピカピカトレラン１年生":"ピカピカトレラン1年生","三ツ池ＴＲＣ":"三ツ池TRC","ＫＫ":"KK","ソロペア③":"ソロペア③","ＹＡＣＫ":"YACK","ざっきーず":"ざっきーず","ＴＥＡＭ猿投":"team猿投","よびじ":"よびじ","俺たちＫＡＰＰブラザーズ！！":"俺たちKAPPブラザーズ!!","チームＫＹ":"チームKY","もっちゃんち":"もっちゃんち","ジャンダラリンキンコンカン":"ジャンダラリンキンコンカン","白黒大熊":"白黒大熊","ちーむ！":"ちーむ！","酒飲みランナーで　ＲＯＪ　Ｉ組":"酒飲みランナーで　ROJ I組","チームリカちゃん":"チームリカちゃん","五平餅":"五平餅","お山クラブ":"お山クラブ","友蔵と仲間たち":"友蔵と仲間たち","静岡サイクルＲＴ":"静岡サイクルRT","梅干しツインズ":"梅干しツインズ","桐朋高等学校陸上競技部":"桐朋高等学校陸上競技部","高７５回":"高75回","高７３回":"高73回","Ｉ－ＴＡＩＷＡＮ　ＣＬＵＢ":"I-Taiwan Club","浦高７１期ＯＢ":"浦高71期OB","宮内小学校":"宮内小学校","実行委員長":"実行委員長","茨大ＯＢ":"茨大OB","ワイの鎌倉":"ワイの鎌倉","千葉大学大学院":"千葉大学大学院","長野県伊那市":"長野県伊那市","ＷＭＴＲＣ２０２５加油":"WMTRC2025加油","台中魔神火影":"台中魔神火影","都遠道而來了就跑ＭＥ吧":"都遠道而來了就跑ME吧","這是隊名":"這是隊名","甲鬼":"甲鬼","ＷＭＴＲＣ２０２５開心":"WMTRC2025開心","郭曼雯":"郭曼雯","小李衝衝衝":"小李衝衝衝","新生醫專":"新生醫專","竹東高中":"竹東高中","光復高中":"光復高中","台中市東山高中":"台中市東山高中","臺北市立西松高中":"臺北市立西松高中","嶺東高中":"嶺東高中","臺北市立永春高中":"臺北市立永春高中","磐石高中":"磐石高中","ＣＡＲＡＴ":"CARAT","善美真華德福":"善美真華德福","新竹縣康乃薾雙語中小學":"新竹縣康乃薾雙語中小學","寶貝ＧＯＧＯＧＯ":"寶貝Gogogo","治平國中":"治平國中","成功國中":"成功國中","新竹縣光明國小":"新竹縣光明國小","竹北光明國小":"竹北光明國小","徐梓原":"徐梓原","ＫＪ":"KJ","楊梅國小":"楊梅國小","竹科實小":"竹科實小","葉老闆":"葉老闆","沒有":"沒有","周仲瑜":"周仲瑜","矽品老馬":"矽品老馬","杰克定向家族":"杰克定向家族","定向好好玩":"定向好好玩","聯發ＩＳＤ":"聯發ISD","ＷＭＴＲＣ２０２５好累腳好酸":"WMTRC2025好累腳好酸","熱血玩咖":"熱血玩咖","黃家小隊":"黃家小隊","橫山國中":"橫山國中","越野越美麗":"越野越美麗","亞崴機電":"亞崴機電","ＷＭＴＲＣ２０２５加油團":"WMTRC2025加油團","前鎮國中":"前鎮國中","新竹定向家族雙柚之家":"新竹定向家族雙柚之家","陳麗玟":"陳麗玟","可可嬤隊":"可可嬤隊","廖浦均":"廖浦均","左阜右邑":"左阜右邑","大可隊":"大可隊","蒟蒻隊":"蒟蒻隊","馬拉玩定向":"馬拉玩定向","布丁果凍家":"布丁果凍家","小可隊":"小可隊","ＣＰ":"CP","計セン":"計セン","越王会シニアＯＬＤ":"越王会シニアOLD","越王会くまもと":"越王会くまもと","越王会茨城":"越王会茨城","ニコン山の会":"ニコン山の会","ＯＣＧ登山部":"OCG登山部","ペアラレーシングクラブ":"ペアラレーシングクラブ","いづもＯＬＣ関東支部":"いづもOLC関東支部","愛心メモリアル病院":"愛心メモリアル病院","大雪を囲む会":"大雪を囲む会","税理士法人ノース財務会計":"税理士法人ノース財務会計","印旛郡民会":"印旛郡民会","札幌市あやめ野中学校":"札幌市あやめ野中学校","道産子レーターズ":"道産子レーターズ","蝦夷富士レーターズ":"蝦夷富士レーターズ","二本木　佳輝　・　井内　勝一":"二本木 佳輝 ・ 井内 勝一","五十嵐　孝宏　・　堀籠　和也":"五十嵐 孝宏 ・ 堀籠 和也","河瀬　亨哉　・　石井　芳政":"河瀬 亨哉 ・ 石井 芳政","増田　翼　・　澤田　浩規":"増田 翼 ・ 澤田 浩規","兼平　悦子　・　竹原　雪絵":"兼平 悦子 ・ 竹原 雪絵","折舘　広記　・　中谷　弥生":"折舘 広記 ・ 中谷 弥生","菅野　誠仁　・　豊田　ゆき":"菅野 誠仁 ・ 豊田 ゆき","佐藤　里美　・　佐藤　光博":"佐藤 里美 ・ 佐藤 光博","ＭＡＭＭＵＴ北海道":"MAMMUT北海道","吉澤　良　・　千田　大介":"吉澤 良 ・ 千田 大介","直立真顔クラブ郡山":"直立真顔クラブ郡山","ほーりーす":"ほーりーす","安代中学校":"安代中学校","嘉義市":"嘉義市","町巷運動工作室":"町巷運動工作室","金寧中小學":"金寧中小學","啊哈哈哈哈":"啊哈哈哈哈","臺北市萬興國小":"臺北市萬興國小","ＥＴＧＯ":"ETGO","火影減肥中":"火影減肥中","再減４公斤":"再減4公斤","賴葉ＰＰ這一家代表隊":"賴葉PP這一家代表隊","聚ＳＹＮＥＲＧＹ":"聚Synergy","ＫＵＯ　ＦＡＭＩＬＹ":"KUO Family","新北市青潭國小":"新北市青潭國小","國立台灣師範大學":"國立台灣師範大學","輔仁大學":"輔仁大學","多喝水":"多喝水","來練習的":"來練習的","新北市立安康高中":"新北市立安康高中","嘉義高工":"嘉義高工","龍華科技大學":"龍華科技大學","金門縣金寧中小學":"金門縣金寧中小學","國立政大附中":"國立政大附中","臺北市幼華高級中學國中部":"臺北市幼華高級中學國中部","新北市立五峰國中":"新北市立五峰國中","新莊國小":"新莊國小","魔神仔競技定向俱樂部":"魔神仔競技定向俱樂部","ＧＯＯＤ　ＰＬＡＣＥ":"Good place","．．":"..","前鎮":"前鎮","彰化縣立成功高級中學":"彰化縣立成功高級中學","仙台の民":"仙台の民","黒森山を愛でる会":"黒森山を愛でる会","青葉会１６　ＥＳ関東Ｃ":"青葉会16 ES関東C","廿日市":"廿日市","ＰＡＴＨＦＩＮＤＥＲＳ":"Pathfinders","岡山県ＯＬクラブ":"岡山県OLクラブ","モミジヤＡＣ":"モミジヤAC","神大大学":"神大大学","ＭＥ　北海道１　６　走":"ME 北海道１ 6 走","ＭＥ　神奈川　３　走":"ME 神奈川 3 走","ＭＥ　北海道３　５　走":"ME 北海道３ 5 走","ＭＥ　岩手県１　３　走":"ME 岩手県１ 3 走","ＭＥ　北海道１　１　走":"ME 北海道１ 1 走","ＭＥ　北海道３　４　走":"ME 北海道３ 4 走","ＭＥ　岩手県１　２　走":"ME 岩手県１ 2 走","ＷＥ　北海道２　３　走":"WE 北海道２ 3 走","ＭＥ　北海道２　４　走":"ME 北海道２ 4 走","ＭＥ　東京都　６　走":"ME 東京都 6 走","ＭＥ　神奈川　６　走":"ME 神奈川 6 走","ＷＥ　北海道２　６　走":"WE 北海道２ 6 走","ＭＥ　岩手県２　５　走":"ME 岩手県２ 5 走","ＷＥ　長野県　３　走":"WE 長野県 3 走","ＷＥ　北海道１　１　走":"WE 北海道１ 1 走","ＭＥ　東京都　１　走":"ME 東京都 1 走","ＷＥ　長野県　２　走":"WE 長野県 2 走","ＷＥ　北海道１　４　走":"WE 北海道１ 4 走","ＭＥ　岩手県２　２　走":"ME 岩手県２ 2 走","ＭＥ　北海道２　１　走":"ME 北海道２ 1 走","ＭＥ　神奈川　１　走":"ME 神奈川 1 走","ＭＥ　北海道３　１　走":"ME 北海道３ 1 走","ＭＥ　北海道１　２　走":"ME 北海道１ 2 走","ＭＥ　岩手県１　５　走":"ME 岩手県１ 5 走","ＭＥ　北海道１　３　走":"ME 北海道１ 3 走","ＭＥ　北海道３　６　走":"ME 北海道３ 6 走","ＭＥ　岩手県１　４　走":"ME 岩手県１ 4 走","ＷＥ　北海道２　１　走":"WE 北海道２ 1 走","ＭＥ　神奈川　４　走":"ME 神奈川 4 走","ＭＥ　北海道２　２　走":"ME 北海道２ 2 走","ＷＥ　北海道２　４　走":"WE 北海道２ 4 走","ＭＥ　東京都　２　走":"ME 東京都 2 走","ＭＥ　岩手県２　３　走":"ME 岩手県２ 3 走","ＭＥ　岩手県２　６　走":"ME 岩手県２ 6 走","ＷＥ　北海道１　５　走":"WE 北海道１ 5 走","ＷＥ　長野県　４　走":"WE 長野県 4 走","ＭＥ　東京都　３　走":"ME 東京都 3 走","ＷＥ　北海道１　２　走":"WE 北海道１ 2 走","ＭＥ　北海道２　５　走":"ME 北海道２ 5 走","ＷＥ　長野県　５　走":"WE 長野県 5 走","ＭＥ　北海道１　４　走":"ME 北海道１ 4 走","ＭＥ　神奈川　５　走":"ME 神奈川 5 走","ＭＥ　北海道３　３　走":"ME 北海道３ 3 走","ＭＥ　岩手県１　６　走":"ME 岩手県１ 6 走","ＭＥ　北海道１　５　走":"ME 北海道１ 5 走","ＷＥ　北海道２　５　走":"WE 北海道２ 5 走","ＭＥ　岩手県１　１　走":"ME 岩手県１ 1 走","ＭＥ　北海道３　２　走":"ME 北海道３ 2 走","ＭＥ　北海道２　６　走":"ME 北海道２ 6 走","ＭＥ　東京都　４　走":"ME 東京都 4 走","ＭＥ　岩手県２　１　走":"ME 岩手県２ 1 走","ＭＥ　神奈川　２　走":"ME 神奈川 2 走","ＷＥ　北海道２　２　走":"WE 北海道２ 2 走","ＭＥ　岩手県２　４　走":"ME 岩手県２ 4 走","ＷＥ　北海道１　３　走":"WE 北海道１ 3 走","ＭＥ　東京都　５　走":"ME 東京都 5 走","ＷＥ　長野県　１　走":"WE 長野県 1 走","ＭＥ　北海道２　３　走":"ME 北海道２ 3 走","ＷＡ　ＴＥＡＭＦＬＡＴ♭　５　走":"WA Teamflat♭ 5 走","ＭＡ　ＥＳ関東Ｃ　１　走":"MA ES関東C 1 走","ＭＡ　ＥＳ関東Ｃ　４　走":"MA ES関東C 4 走","ＷＡ　ＴＥＡＭＦＬＡＴ♭　２　走":"WA Teamflat♭ 2 走","ＷＡ　ＴＥＡＭＦＬＡＴ♭　６　走":"WA Teamflat♭ 6 走","ＷＡ　ＴＥＡＭＦＬＡＴ♭　１　走":"WA Teamflat♭ 1 走","ＭＡ　ＥＳ関東Ｃ　３　走":"MA ES関東C 3 走","ＷＡ　ＴＥＡＭＦＬＡＴ♭　３　走":"WA Teamflat♭ 3 走","ＭＡ　ＥＳ関東Ｃ　５　走":"MA ES関東C 5 走","ＷＡ　ＴＥＡＭＦＬＡＴ♭　４　走":"WA Teamflat♭ 4 走","ＭＡ　ＥＳ関東Ｃ　２　走":"MA ES関東C 2 走","ＹＴＣ":"YTC","東京都レクリエーション協会副会長":"東京都レクリエーション協会副会長","西京極の会":"西京極の会","ＪＤＯＡ＆入間ＯＬＣ":"JDOA&入間OLC","ＣＩＴＩＥＳ　ＳＫＹＬＩＮＥＳ":"Cities Skylines","東北大ＯＢ":"東北大OB","ＦＫ　ＨＥＲＫＵＬＥＳ":"FK Herkules","鳩の会・無一門":"鳩の会・無一門","源流キリン":"源流キリン","用宗みなとサウナクラブ":"用宗みなとサウナクラブ","ねこのて":"ねこのて","野良ティア":"野良ティア","迷子のクジラ":"迷子のクジラ","もなか＆モリシーと矢田":"もなか&モリシーと矢田","山本　ひより":"山本 ひより","滝家りんご":"滝家りんご","ＳＡＫＡＮＡ食べたい":"sakana食べたい","元静岡ＯＬＣ":"元静岡OLC","アラジントレランクラブ":"アラジントレランクラブ","バウムブラザーズ":"バウムブラザーズ","近江八幡市":"近江八幡市","環境リスク工学":"環境リスク工学","横浜ＯＬＣクラブ":"横浜ＯＬＣクラブ","鶴舞オリエンテーリング":"鶴舞オリエンテーリング","牧戸一門":"牧戸一門","那覇市":"那覇市","名護市":"名護市","山ノ内東小学校":"山ノ内東小学校","おふとん。":"おふとん。","いのぶた会":"いのぶた会","道志会":"道志会","そろＳＯＬＯ限界":"そろSOLO限界","山つなぎ人つなぎ":"山つなぎ人つなぎ","津市":"津市","上富田町":"上富田町","農工":"農工","ＪＤＯＡ　入間市ＯＬＣ":"JDOA　入間市OLC","豊川山学会":"豊川山学会","能登町":"能登町","Ｂ－けもの道":"B-けもの道","北九州市":"北九州市","青葉会’":"青葉会’","さくら組Ｂチーム":"さくら組Bチーム","栃木県民":"栃木県民","平山さんだいすきクラブ":"平山さんだいすきクラブ","太尾走ろう会":"太尾走ろう会","チームカルテット":"チームカルテット","コン直愛好会":"コン直愛好会","ゴールデンシスターズ":"ゴールデンシスターズ","東京都八王子市":"東京都八王子市","京大ＯＫＣ":"京大OKC","東京都品川区":"東京都品川区","兵庫県加古川市":"兵庫県加古川市","兵庫県尼崎市":"兵庫県尼崎市","愛知県大府市":"愛知県大府市","広島県福山市":"広島県福山市","奈良県高市郡":"奈良県高市郡","愛知県岡崎市":"愛知県岡崎市","大阪府羽曳野市":"大阪府羽曳野市","入間市ＯＬ":"入間市ＯＬ","中之島小学校":"中之島小学校","鳩の会Ｄ":"鳩の会D","ファルコンズ":"ファルコンズ","用松ＦＣ":"用松FC","薮部":"薮部","松江ＦＣだんだん":"松江FCだんだん","ＷＷＲ":"WWR","わいわいランナーズ":"わいわいランナーズ","はなみずき一家":"はなみずき一家","ＧＯＯＧＬＥ　ＡＩ":"Google AI","ケバブ一門":"ケバブ一門","名椙・三河ＯＬＣ":"名椙・三河OLC","わんぱくはらっぱ":"わんぱくはらっぱ","水餃子":"水餃子","新清水ＪＣＴ":"新清水JCT","前作ＣＰ":"前作CP","農産部門":"農産部門","宇治でうじうじ":"宇治でうじうじ","ゾロリーズ":"ゾロリーズ","大阪城ランニングの会":"大阪城ランニングの会","口にやさしい食べ物一門":"口にやさしい食べ物一門","瑞穂区":"瑞穂区","石清水ＨＭＧ":"石清水HMG","Ａ４－":"A4-","滑膜炎ＯＬＣ":"滑膜炎OLC","ＣＡＴＡＬＹＳＴ　ＤＥＳＩＧＮ":"Catalyst Design","日野町立日野小学校ＯＢ":"日野町立日野小学校OB","尼崎で走る会":"尼崎で走る会","ＤＥＡＤ　ＦＩＳＨ　ＥＹＥＳ":"Dead fish eyes","カフェテリアルネ":"カフェテリアルネ","京都０ＬＣ":"京都0LC","新清水ＪＴＣ":"新清水JTC","ひらがな館":"ひらがな館","コメダＦＣ":"コメダFC","ＥＡ絶起すると思う一門":"EA絶起すると思う一門","無能学部資源◯◯科":"無能学部資源◯◯科","愛は世界を救う一門":"愛は世界を救う一門","ＥＡ":"EA","京都大学桂":"京都大学桂","ステーキガスト秋田広面店":"ステーキガスト秋田広面店","京大南部構内":"京大南部構内","マイナビ":"マイナビ","いらっしゃいませ研究会":"いらっしゃいませ研究会","一応お嬢部":"一応お嬢部","ぎゃるまいんど部":"ぎゃるまいんど部","いとはん":"いとはん","よねはち":"よねはち","吹田市":"吹田市","ＡＵＳＴＲＡＬＯＰＥＲＳ":"Australopers","ＥＭＩＴ協会":"EMIT協会","渋谷":"渋谷","阿佐ヶ谷ＬＯＶＥＲ":"阿佐ヶ谷Lover","津田塾":"津田塾","コントローラー":"コントローラー","高松市":"高松市","慶應義塾":"慶應義塾","電通大ＯＢ":"電通大OB","東北大学農学部":"東北大学農学部","桐生大学付属中学校":"桐生大学付属中学校","渋川女子Ａ":"渋川女子A","さわやかウオーキング　ドリーム":"さわやかウオーキング　ドリーム","さわやかウオーキング　ミラクル":"さわやかウオーキング　ミラクル","太田女子Ｂ":"太田女子B","太田女子Ａ":"太田女子A","うらわかき乙女たち":"うらわかき乙女たち","チームノリノリ":"チームノリノリ","パンダさんチーム":"パンダさんチーム","さわやかウオーキング　スター":"さわやかウオーキング　スター","高崎うえはら":"高崎うえはら","上三坂ＲＣ":"上三坂ＲＣ","かべちゃん":"かべちゃん","チームミニこび":"チームミニこび","ＭＳＲ":"MSR","どなべ":"どなべ","チームすずき":"チームすずき","チームクン":"チームクン","チームリン":"チームリン","チームお布団":"チームお布団","チームふたご":"チームふたご","ＳＮＯＷ":"snow","なるちゃんず":"なるちゃんず","こうまの":"こうまの","チームおにいちゃん":"チームおにいちゃん","チームこめちゃん":"チームこめちゃん","このはな":"このはな","高松高校送球部":"高松高校送球部","和のくらし文化研究所":"和のくらし文化研究所","石原一門長":"石原一門長","京都市立修学院中学校ワンダーフォーゲル部":"京都市立修学院中学校ワンダーフォーゲル部","ドラッグユタカ百万遍店":"ドラッグユタカ百万遍店","ＢＨＡＶＩＴＵＭ":"Bhavitum","東大　ＯＬＫ":"東大 OLK","阪大ＯＬＣ、ごつごつ一門":"阪大OLC、ごつごつ一門","上條ＲＣ":"上條RC","茨城県協会":"茨城県協会","ＳＥＧ":"SEG","熱笑ＯＬＣ":"熱笑OLC","ＴＯＯＧＯＯＤ":"TOOGOOD","チガジョグＡＳＫ":"チガジョグASK","人力旅行":"人力旅行","イバコウ":"イバコウ","パンダ":"パンダ","ＧＲＯＷＩＮＧ":"Growing","ローガン":"ローガン","安眠棒":"安眠棒","ニラシバ":"ニラシバ","ＣＣＣ　つるまいＯＬＣ":"CCC　つるまいOLC","ＨＡＣ":"HAC","オリー":"オリー","おもて":"おもて","信典":"信典","小太郎":"小太郎","信展":"信展","康之":"康之","洋子":"洋子","久子":"久子","美樹子":"美樹子","ＩＣ岡山ランナーズ":"IC岡山ランナーズ","ＣＬＣふるはうす":"CLCふるはうす","のり":"のり","神戸ＬＳＣ":"神戸LSC","筑波大学」":"筑波大学」","鷺":"鷺","ＨＳ":"HS","西山本ＦＡＴＨＥＲＳ":"西山本Fathers","ＯＬほわほわ":"OLほわほわ","俳句の会":"俳句の会","邦友会":"邦友会","水曜高尾練":"水曜高尾練","ＷＩＮＫ　ＲＵＮＮＩＮＧ　ＴＥＡＭ":"wink running team","木酔会":"木酔会","ＪＷＯＣ２０２６日本代表":"JWOC2026日本代表","ラーメンショップ":"ラーメンショップ","三河ＯＬ　Ｃ":"三河OL C","岡崎市立常磐小学校":"岡崎市立常磐小学校","大垣日本大学高校":"大垣日本大学高校","小平ＯＬＫ":"小平OLK","練馬ＯＫＣ":"練馬OKC","建築士の卵":"建築士の卵","札幌医科大学スキー部":"札幌医科大学スキー部","北大":"北大","ＢＥΑオス":"Beαオス","潟東中学校ＯＢ":"潟東中学校OB","うさぎ会いいはとうぶ":"うさぎ会いいはとうぶ","鯖":"鯖","九州大学":"九州大学","岩国ＯＬＣ":"岩国OLC","ＤＥＳＴＲＡ":"Destra","ＯＬＣ":"OLC","トータス・練馬ＯＬＣ":"トータス・練馬OLC","玉露カムバック":"玉露カムバック","来年は玉露":"来年は玉露","安定の玉露":"安定の玉露","次は煎茶":"次は煎茶","ＷＯＣ運営":"WOC運営","まずは煎茶から":"まずは煎茶から","おーいお茶":"おーいお茶","ＴＥＡＭ☆ＢＡＥＮＳ":"TEAM☆BAENS","福岡県ＯＬ協会":"福岡県ＯＬ協会","山の民":"山の民","トミノスペシャル":"トミノスペシャル","Ｅ＆Ｎ":"E&N","ヒデとクミ":"ヒデとクミ","チームしばた":"チームしばた","チーム":"チーム","チームＢＭ":"チームBM","山内Ａ":"山内A","山内Ｂ":"山内B","ＳＳＫ":"SSK","ど":"ど","チームＲＩＣＯ":"チームRICO","ユニバ落ち":"ユニバ落ち","桐朋中学オリエンテーリング部":"桐朋中学オリエンテーリング部","早大ＯＣ寿会・練馬ＯＬＣ":"早大OC寿会・練馬OLC","足柄ＯＬＣ":"足柄OLC","ＬＡＳＡＭＩ．ＰＬ":"Lasami.pl","ＷＩＮＤＳ":"WINDS","椙山ＯＧ":"椙山OG","あいちシニアＯＬ愛好会":"あいちシニアOL愛好会","鳩の会・ＯＬＰ兵庫":"鳩の会・OLP兵庫","Ｄファルコンズ":"Dファルコンズ","ラナ・サルード":"ラナ・サルード","いわき市":"いわき市","よだかＯＬＣ":"よだかOLC","ＨＡＮＤＡＩ　ＯＬＣ":"Handai OLC","テープ誘導をちゃんと辿ろうの会":"テープ誘導をちゃんと辿ろうの会","向本折校下":"向本折校下","犬丸校下":"犬丸校下","広島県協会":"広島県協会","東北大学オリエンテーリング　部":"東北大学オリエンテーリング 部","すずかけＯＬＣ":"すずかけOLC","ＯＶＥＲＬＯＲＤＣＯＡＣＨＭＡ":"OverlordCoachMA","ＢＴＦ．":"BtF.","みはらしの千果園":"みはらしの千果園","七尾市ＯＬ協会":"七尾市OL協会","田端ＯＬ系":"田端OL系","東北大学学友会オリエンテーリング部":"東北大学学友会オリエンテーリング部","東京理科大":"東京理科大","東京理科大学大学院":"東京理科大学大学院","横浜国立大学ＯＢ":"横浜国立大学OB","広島大学大学院":"広島大学大学院","金沢工業大学":"金沢工業大学","ロン毛倶楽部":"ロン毛倶楽部","すずかけ歴":"すずかけ歴","ちばだい":"ちばだい","つくば":"つくば","ＨＥＭＥＲＯＣＡＬＬＩＳ":"Hemerocallis","姫路市":"姫路市","但馬銀行":"但馬銀行","ＨＫＧ":"HKG","宝塚市":"宝塚市","明日香村":"明日香村","プラトーこのはな養父市":"プラトーこのはな養父市","ぷらんなあ":"ぷらんなあ","会津工業":"会津工業","東大ＯＬＫ一橋":"東大OLK一橋","東北大学　オリエンテーリング部":"東北大学　オリエンテーリング部","氷笑":"氷笑","駿台予備学校":"駿台予備学校","煎茶":"煎茶","まだまだ玉露":"まだまだ玉露","抹茶３走":"抹茶3走","ＯＣ大会実長":"OC大会実長","煎茶２走":"煎茶2走","溝端の壁":"溝端の壁","ＴＳＵＪＩＭＵＲＡ　ＬＡＢ":"Tsujimura lab","良い顔":"良い顔","ＭＥＺＭＡＬＡＳ":"Mezmalas","ＵＥ　ＳＡＢＡＤＥＬＬ　Ｏ":"UE Sabadell O","ＴＥＬＥＮＯＲ　ＢＩＬ":"Telenor BIL","ＯＳＴＭＡＲＫＡ　ＯＫ":"Ostmarka OK","ＣＡＭＢＲＩＤＧＥ　ＳＰＯＲＴＳ　ＵＮＩＯＮ":"Cambridge Sports Union","ＳＥＧＯＶＩＡ　Ｏ":"Segovia O","ＴＡＲＫ　ＥＩ　ＴＯＲＭＡ":"Tark ei torma","ＥＸＰＲＥＳ　ＣＺＥＣＨ　ＴＥＡＭ":"Expres Czech Team","ＮＥＶＥＲＦＪＯＲＤ　ＩＬ":"Neverfjord IL","ＫＦＵＭ　ＯＲＥＢＲＯ":"KFUM Orebro","ＡＣ　ＭＯＯＳＢＵＲＧ　ＯＬ":"AC Moosburg OL","ＣＯＳＥＬＥ":"COSELE","�ＳＷＯＣ�ＧＢＲ�ＧＢＲ�":"�SWOC�GBR�GBR�","ＯＬ　ＴＥＡＭ　ＷＥＨＲＳＤＯＲＦ":"OL Team Wehrsdorf","ＯＫ　ＰＡＮ　ＫＲＩＳＴＩＡＮＳＴＡＤ":"OK Pan Kristianstad","水呑中学校":"水呑中学校","寿会":"寿会","東大ＯＬＫ３５ＴＨ":"東大OLK35th","松本深志高校":"松本深志高校","岡山市立操山中学校":"岡山市立操山中学校","横浜市立義務教育学校緑園学園":"横浜市立義務教育学校緑園学園","信州大学教育学部附属松本中学校":"信州大学教育学部附属松本中学校","板橋区立高島第三中学校":"板橋区立高島第三中学校","東葛飾ＯＢ":"東葛飾OB","東京工業":"東京工業","杉村　力輝":"杉村　力輝","東　遼次":"東　遼次","野本凜太郎":"野本凜太郎","中村　航輔":"中村　航輔","髙橋　悠心":"髙橋　悠心","一原　弘樹":"一原　弘樹","久保田　綴":"久保田　綴","安田　悠人":"安田　悠人","清水　大輔":"清水　大輔","伊藤　道隆":"伊藤　道隆","若井　琉真":"若井　琉真","木山　佳城":"木山　佳城","西川想介":"西川想介","石橋　虎大":"石橋　虎大","神林　大翔":"神林　大翔","岩原　陸人":"岩原　陸人","吉成　正友紀":"吉成　正友紀","清水　陽翔":"清水　陽翔","池田　陽仁":"池田　陽仁","西川稜真":"西川稜真","飯塚　敦郎":"飯塚　敦郎","池田　光汰":"池田　光汰","青木　佑成":"青木　佑成","林　剛広":"林　剛広","勅使河原　舜":"勅使河原　舜","小林　羽琉":"小林　羽琉","平野　碧人":"平野　碧人","内山　尊":"内山　尊","植松　健人":"植松　健人","清水　渓杜":"清水　渓杜","野原　　凜太朗":"野原　　凜太朗","大崎　千里":"大崎　千里","佐野　寛明":"佐野　寛明","星野　道太朗":"星野　道太朗","水嶋　竜也":"水嶋　竜也","阿部　一飛":"阿部　一飛","伊東　　大翔":"伊東　　大翔","杉﨑　惺哉":"杉﨑　惺哉","三津家　卓和":"三津家　卓和","西野　航平":"西野　航平","山本　朔太郎":"山本　朔太郎","三浦　創士":"三浦　創士","松原　伸治":"松原　伸治","米原　知明":"米原　知明","中島　伸一郎":"中島　伸一郎","石井　百花":"石井　百花","勝田　有美":"勝田　有美","勝田　夏妃":"勝田　夏妃","植松　里咲子":"植松　里咲子","山下　仁花":"山下　仁花","源後　彩乃":"源後　彩乃","青木　ことり":"青木　ことり","加藤　里菜子":"加藤　里菜子","風山　珠希":"風山　珠希","二川　裕斗":"二川　裕斗","横山　瑛大":"横山　瑛大","堀　颯真":"堀　颯真","金子　由樹":"金子　由樹","大沼　甲士朗":"大沼　甲士朗","石川　倫太郎":"石川　倫太郎","朴　祥雨":"朴　祥雨","大野　樹":"大野　樹","村戸　俊介":"村戸　俊介","亀本　健":"亀本　健","石橋　珀築":"石橋　珀築","原田　啓太":"原田　啓太","奥平　祥成":"奥平　祥成","佐伯　駿仁":"佐伯　駿仁","清水　大輝":"清水　大輝","藤崎　央晴":"藤崎　央晴","岩﨑　瑛亮":"岩﨑　瑛亮","鈴木　日葵":"鈴木　日葵","石田　匠哉":"石田　匠哉","奥本　崇文":"奥本　崇文","細沼　慎司":"細沼　慎司","佐藤　佑":"佐藤　佑","池　遥大":"池　遥大","石井　雄大":"石井　雄大","常山　拓幹":"常山　拓幹","柏　大介":"柏　大介","浅野　慧雅":"浅野　慧雅","長　俊一朗":"長　俊一朗","須加　美考":"須加　美考","荻原　海斗":"荻原　海斗","仙波　舜都":"仙波　舜都","小林　洸大":"小林　洸大","大河原　颯馬":"大河原　颯馬","北丸　大樹":"北丸　大樹","山岡　薫平":"山岡　薫平","林　雅仁":"林　雅仁","井上　崇太":"井上　崇太","田原　圭史":"田原　圭史","白石　竜一":"白石　竜一","南　陽太":"南　陽太","榎本　暖":"榎本　暖","白石　真音":"白石　真音","鈴木　亮丞":"鈴木　亮丞","市川　日楽":"市川　日楽","金子　智輝":"金子　智輝","安形　瑛":"安形　瑛","佐藤　泰希":"佐藤　泰希","水村　太一":"水村　太一","水本　悠太":"水本　悠太","野村　昂平":"野村　昂平","岩城　晴大":"岩城　晴大","廣田　陽音":"廣田　陽音","中村　圭祐":"中村　圭祐","門上　義之":"門上　義之","吉本律花":"吉本律花","島本　瑛太":"島本　瑛太","笠松　悠史":"笠松　悠史","柴山　朋也":"柴山　朋也","桂　哲大":"桂　哲大","根本　一輝":"根本　一輝","千島　絵茉":"千島　絵茉","関口　昂之介":"関口　昂之介","山崎　悠真":"山崎　悠真","杉山　陽音":"杉山　陽音","吉田　真菜":"吉田　真菜","鈴木　創一朗":"鈴木　創一朗","栗田　稜也":"栗田　稜也","波羅　哲":"波羅　哲","女井　岳哉":"女井　岳哉","皆川　美紀子":"皆川　美紀子","堀田　真敏":"堀田　真敏","碓井　俊":"碓井　俊","岡田　寛己":"岡田　寛己","森　彩葉":"森　彩葉","矢板橋　秋香":"矢板橋　秋香","室田　拓哉":"室田　拓哉","倉上　英":"倉上　英","遠山　卓也":"遠山　卓也","植田　朋果":"植田　朋果","伊藤　頌太":"伊藤　頌太","山中　秀仁":"山中　秀仁","牛田　凜人":"牛田　凜人","佐藤　諒平":"佐藤　諒平","鈴木　颯太":"鈴木　颯太","手塚琥音":"手塚琥音","中舘　美卯":"中舘　美卯","蔵田　育":"蔵田　育","笠原　稜":"笠原　稜","河内　絵里香":"河内　絵里香","尾形　歩美":"尾形　歩美","吉田　侑生":"吉田　侑生","川口　暁正":"川口　暁正","福田　泰士":"福田　泰士","今　勇翔":"今　勇翔","用松　知樹":"用松　知樹","三井　健世":"三井　健世","牟田　悠真":"牟田　悠真","牧原　崇記":"牧原　崇記","菅崎　純":"菅崎　純","桑原　唯歩":"桑原　唯歩","安慶名　史哉":"安慶名　史哉","冨澤　滉貴":"冨澤　滉貴","平田　千畝":"平田　千畝","新田　義家":"新田　義家","渡邉　莉子":"渡邉　莉子","杉本　翔雄":"杉本　翔雄","蓼科お散歩ＯＬＣ":"蓼科お散歩OLC","前回大会ＤＮＳ":"前回大会DNS","夜蹴上ＯＬＣ":"夜蹴上OLC","吹田おーえるじー":"吹田おーえるじー","ＤＲＫＳ":"DRKS","こものトレイルランニングクラブ":"こものトレイルランニングクラブ","特技は思い込みと見落とし":"特技は思い込みと見落とし","ＡＬＰオリエンテーリングチーム":"ALPオリエンテーリングチーム","札幌農学校・札幌ＯＬＣ":"札幌農学校・札幌OLC","チョイデカＯＬＣ":"チョイデカOLC","期待の大新人":"期待の大新人","ＯＭＭ塾　岡山県ＯＬ協会":"OMM塾　岡山県OL協会","県協会":"県協会","おひさまトリオ":"おひさまトリオ","Ｙ＆Ｍ":"Y&M","札幌農学校ジョガボール支部":"札幌農学校ジョガボール支部","つばめの会":"つばめの会","株式会社ソフトエイジ":"株式会社ソフトエイジ","桐朋　ＩＫ":"桐朋 IK","茨城大学オリエンテーリング部":"茨城大学オリエンテーリング部","富士見中学校":"富士見中学校","美唄スキーＯ実行委":"美唄スキーO実行委","かなめ測量":"かなめ測量","中央大学附属高校生物部ＷＩＬＤＬＩＦＥ":"中央大学附属高校生物部WILDLIFE","ＴＥＡＭ阿闍梨":"TEAM阿闍梨","ＬＤＡ－ＲＣ":"LDA-RC","富士森走友会":"富士森走友会","千葉大学院":"千葉大学院","ＴＩ－ＭＵ":"ti-mu","Ｏ－ＢＯＹ":"O-BOY","ＢＯＤＹＩＮＮＯＶＡＴＩＯＮ武蔵小金井":"BodyInnovation武蔵小金井","ＴＲＩＰＰＥＲＳ":"trippers","Ｃ－ＴＥＡＭ":"C-team","横浜都筑ＡＣ":"横浜都筑AC","ランオアダイ":"ランオアダイ","あきチョコ":"あきチョコ","ＣＬＵＢ　阿闍梨":"Club 阿闍梨","アシスト走行会":"アシスト走行会","ＯＣ４５期相当":"OC45期相当","コンタケ":"コンタケ","筑波大院":"筑波大院","ＴＩＢ":"tib","調査依頼絶対出すマン":"調査依頼絶対出すマン","立命ＯＬＣのＯＢ":"立命OLCのOB","おさんぽくらぶ":"おさんぽくらぶ","ＯＪＥ　ＷＡＰＰＬＥＲ":"OJE Wappler","チーズ":"チーズ","ＪＯＤＡ":"JODA","石川県ＯＬＫ":"石川県OLK","小松市国府台":"小松市国府台","ＨＯＫＵＲＩＫＵ　　ＤＯＲＯＴＡＢＯＵ":"HOKURIKU  DOROTABOU","野々市市":"野々市市","ここまで入賞":"ここまで入賞","渋谷を走る会":"渋谷を走る会","ＯＢ１年目":"OB1年目","早稲田":"早稲田","ＥＷＳＴＷＩＮＤ":"EWSTWIND","チームＯＦＫ":"チームＯＦＫ","チームピロコ":"チームピロコ","札幌市あやめ野中":"札幌市あやめ野中","千歳ランナーズ":"千歳ランナーズ","パンニング倶楽部":"パンニング倶楽部","東海林　侑祐・相原鉄平":"東海林 侑祐・相原鉄平","二本木　佳輝・小林　宗":"二本木 佳輝・小林 宗","河瀬　亨哉・下田大輔":"河瀬 亨哉・下田大輔","兼平　悦子・竹原　雪絵":"兼平 悦子・竹原 雪絵","菅野　誠仁・豊田　ゆき":"菅野 誠仁・豊田 ゆき","フルーティＢＡＮＢＡＮ":"フルーティBanBan","やまたにまるい":"やまたにまるい","大ちゃんズ":"大ちゃんズ","犬の散歩":"犬の散歩","ＤＹ稲城":"DY稲城","チームあつみ":"チームあつみ","ふらっぐらばーず":"ふらっぐらばーず","吉田山ＲＣ":"吉田山RC","サケオタ":"サケオタ","ＫＡＮＴＡＣロゲ部２班":"KANTACロゲ部2班","源後　知行":"源後 知行","ＧＵＴＳ":"Guts","齋藤　邦彦":"齋藤 邦彦","入間市ＯＬＣ麦茶":"入間市OLC麦茶","新間組":"新間組","本間　晃":"本間 晃","松川文庫":"松川文庫","山で遊び隊":"山で遊び隊","近藤　えり":"近藤 えり","神戸　錬一郎":"神戸 錬一郎","Ｍ＆Ｍ":"M&M","らこだく":"らこだく","宇田川と大久保チーム":"宇田川と大久保チーム","ＯＮＯ練５５年式":"ONO練55年式","ＴＥＡＭ石鍋":"Team石鍋","市村　正明":"市村 正明","渡辺　悟史":"渡辺 悟史","宮島　悟史":"宮島 悟史","ＫＡＧＵＳ":"Kagus","とことこ":"とことこ","たれぱんだ":"たれぱんだ","福井　奈穂":"福井 奈穂","チームドベ":"チームドベ","尾崎　高志":"尾崎 高志","ノマディスク":"ノマディスク","藤田　吉彦":"藤田 吉彦","ラジオスポーツ富士":"ラジオスポーツ富士","関門ファイト":"関門ファイト","ＫＡＮＴＡＣロゲ部　別班":"KANTACロゲ部 別班","ことりけも":"ことりけも","ＴＥＡＭ　Ｙ２Ｈ":"TEAM Ｙ2H","ＴＥＡＭ　Ｅ．Ｔ．":"Team E.T.","お山でＦＵＮＲＵＮＳ":"お山でFUNRUNS","りんりん":"りんりん","もう走ラン":"もう走ラン","ＨＡＭＡＩＳＨＩ　ＬＯＶＥＲＳ":"Hamaishi Lovers","ＳＯ":"SO","ＴＨＥ　ＹＡＳＵＤＡ":"The Yasuda","チームＴＥＲＡＫＥＩ☆":"チームTERAKEI☆","花より稜線":"花より稜線","わさビーム":"わさビーム","広範囲":"広範囲","しろ":"しろ","日本平のお猿たち":"日本平のお猿たち","サイドターン":"サイドターン","チーム　まいさと":"チーム まいさと","石川夫婦山走":"石川夫婦山走","タッキーと愉快な仲間たち♪":"タッキーと愉快な仲間たち♪","幻覚上等":"幻覚上等","チームつっちぃ":"チームつっちぃ","今年もお任せします！":"今年もお任せします！","ＴＴＲ":"ＴＴＲ","サリ平":"サリ平","無謀と堅実":"無謀と堅実","チーム小顔":"チーム小顔","ほぼハンド部":"ほぼハンド部","チームＹＵＺＵ":"チームyuzu","「チーム名」":"「チーム名」","どっちみちーむ":"どっちみちーむ","タキユカ":"タキユカ","ＢＪＲＣ開拓隊":"BJRC開拓隊","ゆきまき":"ゆきまき","ＭＫＥＣ":"MKEC","みっちゃん弁当":"みっちゃん弁当","山岳部ＯＢ":"山岳部OB","チームＫＫ上":"チームKK上","靴ひもをギュッとね":"靴ひもをギュッとね","ビギナーズ":"ビギナーズ","ＬＵＴＺ":"Lutz","チームのこのこ":"チームのこのこ","どんぶりちゃん":"どんぶりちゃん","カルフ":"カルフ","りんごたろう":"りんごたろう","チーム　心はＨＩＴＯＴＳＵ":"チーム 心はHiToTsu","ＫＥＩとりんご":"keiとりんご","アロリンリン":"アロリンリン","うどん屋いしま":"うどん屋いしま","オクム３５関門ファイターズ":"オクム３５関門ファイターズ","雨雲迎撃隊":"雨雲迎撃隊","坂戸山登山部":"坂戸山登山部","三ツ池トレイルランニングクラブ":"三ツ池トレイルランニングクラブ","しゃかりき":"しゃかりき","チーム山さんぽ":"チーム山さんぽ","茶トリオ":"茶トリオ","ニコニコ":"ニコニコ","チュニドラ":"チュニドラ","野猿":"野猿","ＴＥＡＭ　Ｋ．Ｙ":"Team K.Y","ＲＩＫＡＮＡＮＡ":"RikaNana","セネさんと愉快な仲間":"セネさんと愉快な仲間","ロキソニンパープル":"ロキソニンパープル","食いしん坊":"食いしん坊","山好きにさせ隊":"山好きにさせ隊","ラピス　ＷＩＴＨ　ＴＨＥ　ＷＡＣＫＹ　ＣＲＥＷ":"ラピス with the Wacky Crew","熱っちぃ":"熱っちぃ","松本塾スタバラン":"松本塾スタバラン","リカちゃん":"リカちゃん","ニーハイ玉井親子":"ニーハイ玉井親子","スマイリー":"スマイリー","スーザンと仲間たち":"スーザンと仲間たち","ＯＲＩＥＮＴＥＥＲＩＮＧＴＡＲＡＮＡＫＩ":"OrienteeringTaranaki","ＮＴＴドコモ陸上部":"NTTドコモ陸上部","ＯＣＡＤ　ＴＥＡＭ":"OCAD Team","Ｑちゃん":"Qちゃん","チーム北斗星":"チーム北斗星","たいけん":"たいけん","たいちん":"たいちん","千鳥組":"千鳥組","ＡＬ":"AL","千鳥足":"千鳥足","ＰＥＮＧＵＩＮＳ":"Penguins","うさぎ会北海道":"うさぎ会北海道","うさぎ会　岩手":"うさぎ会 岩手","うさぎ会　東京":"うさぎ会　東京","ＴＡＫＡＭＵＧＩ":"TakaMugi","ニームラ":"ニームラ","椙山女学園":"椙山女学園","シャインマスカット":"シャインマスカット","京葉Ｏクラブ":"京葉Oクラブ","ヨッチー山賊団":"ヨッチー山賊団","紀の国４ＤＡＹＳ":"紀の国4days"}};
+/*CLUB_DICT_END*/
+const USE_DICT = () => { const e = document.getElementById("useDict"); return !e || e.checked; };
+function readSettings(){
+  IGNORE = new Set(document.getElementById("ignore").value.split(/\r?\n/).map(w => toZenkaku(w.trim()).toUpperCase()).filter(Boolean));
+  EQUIV = new Map(); EQUIV_DISP = new Map();
+  for (const line of document.getElementById("equiv").value.split(/\r?\n/)){
+    const ws = line.split(/[=＝]/).map(w => w.trim()).filter(Boolean);
+    if (ws.length < 2) continue;
+    const keys = ws.map(w => { const c = cleanClub(toZenkaku(w)); return (c ?? toZenkaku(w)).toUpperCase(); });
+    keys.forEach(k => EQUIV.set(k, keys[0])); EQUIV_DISP.set(keys[0], ws[0]);
+  }
+}
+// 所属欄 → {比較キー: 表示用} 。同一視・除外語を適用
+// 所属欄を正表記に置換した文字列（出力用）。辞書オフなら元のまま。
+// スラッシュで分けた要素ごとに、同一視欄→辞書の別名→辞書の正表記の順で置き換え、辞書にない要素は元の表記のまま残す
+function canonClub(club){
+  const raw = String(club ?? "").trim();
+  if (!USE_DICT() || !raw) return raw;
+  // 末尾の 期・年・学年などの数字（例 青葉会22、筑波大学 2、OLK41期）は判定では無視するが、出力では元のまま残す
+  const RE_SUF = /([\s\u3000]*[0-9０-９]+(?:期|年)?)$/;
+  return raw.split(/[/／]/).map(part => {
+    const orig = part.trim(); if (!orig) return orig;
+    const m = RE_SUF.exec(orig), suf = m ? m[1] : "", base = m ? orig.slice(0, m.index) : orig;
+    if (!base) return orig;
+    const cc = cleanClub(toZenkaku(base)); if (!cc) return orig;
+    let k = cc.toUpperCase();
+    let rep;
+    if (EQUIV.has(k)){ k = EQUIV.get(k); rep = EQUIV_DISP.get(k); }
+    else rep = CLUB_DICT.display[k];   // 多数派の表記に統一（別名の同一視は上の欄で管理）
+    return (rep || base) + suf;
+  }).join("/");
+}
+// 画面表示用：置換後が元と違うときだけ、置換後の所属を返す
+function aliasNote(club){
+  const c = canonClub(club);
+  return c !== String(club ?? "").trim() ? c : "";
+}
+function clubsOf(club){
+  const out = {};
+  for (let c of toZenkaku(club).split(/[/／]/)){
+    c = cleanClub(c); if (!c) continue;
+    let k = c.toUpperCase();
+    if (EQUIV.has(k)) k = EQUIV.get(k);
+    if (IGNORE.has(k)) continue;
+    if (!(k in out)) out[k] = (USE_DICT() && CLUB_DICT.display[k]) || c;
+  }
+  return out;
+}
+function toMin(t){ const m = /^\s*(\d{1,2}):(\d{2})/.exec(t || ""); return m ? (+m[1])*60 + (+m[2]) : null; }
+function sortKey(r){ const t = toMin(r.time); return [t === null ? 1e9 : t, r.seq ?? r._i]; }
+function cmpKey(a, b){ const ka = sortKey(a), kb = sortKey(b); return ka[0]-kb[0] || ka[1]-kb[1]; }
+function esc(s){ return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// ============================================================
+// 乱数（seed 固定で再現可能）
+// ============================================================
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// ============================================================
+// 判定と並べ替え（reorder_start.py の移植）
+// ============================================================
+function conflicts(order, keys){ let c = 0; for (let i = 0; i + 1 < order.length; i++) if (inter(keys[order[i]], keys[order[i+1]])) c++; return c; }
+function inter(a, b){ for (const k of a) if (b.has(k)) return true; return false; }
+function solveClass(people, iters, rng){
+  const n = people.length, keys = people.map(p => new Set(Object.keys(p._clubs)));
+  let order = [...Array(n).keys()];
+  const base = conflicts(order, keys);
+  if (base === 0 || n < 3) return [order, base];
+  const cost = o => { let mv = 0; for (let i = 0; i < n; i++) if (o[i] !== i) mv++; return conflicts(o, keys)*1000 + mv; };
+  // 1) 貪欲修復
+  let improved = true;
+  while (improved){
+    improved = false;
+    for (let i = 0; i + 1 < n; i++){
+      if (!inter(keys[order[i]], keys[order[i+1]])) continue;
+      let best = null; const cur = cost(order);
+      for (let j = 0; j < n; j++){
+        if (j === i || j === i+1) continue;
+        for (const k of [i+1, i]){
+          const o = order.slice(); [o[k], o[j]] = [o[j], o[k]];
+          const c = cost(o);
+          if (c < cur && (best === null || c < best[0])) best = [c, o];
+        }
+      }
+      if (best){ order = best[1]; improved = true; break; }
+    }
+  }
+  // 2) 焼きなまし
+  let cur = cost(order), bestO = order.slice(), bestC = cur; const T0 = 300;
+  for (let t = 0; t < iters; t++){
+    if (bestC < 1000) break;
+    const T = T0*(1 - t/iters) + 1e-3;
+    let i = Math.floor(rng()*n), j = Math.floor(rng()*(n-1)); if (j >= i) j++;
+    const o = order.slice(); [o[i], o[j]] = [o[j], o[i]];
+    const c = cost(o);
+    if (c <= cur || rng() < Math.exp((cur - c)/T)){ order = o; cur = c; if (c < bestC){ bestO = o.slice(); bestC = c; } }
+  }
+  order = bestO;
+  // 3) 戻し
+  improved = true;
+  while (improved){
+    improved = false; const c0 = conflicts(order, keys);
+    for (let i = 0; i < n; i++){
+      if (order[i] === i) continue;
+      const j = order.indexOf(i), o = order.slice(); [o[i], o[j]] = [o[j], o[i]];
+      if (conflicts(o, keys) <= c0){ order = o; improved = true; break; }
+    }
+  }
+  return [order, conflicts(order, keys)];
+}
+function attachClubs(rows){ rows.forEach((r, i) => { r._i = i; r._clubs = clubsOf(r.club); }); }
+function markPairs(rows){
+  const by = {}; rows.forEach(r => { delete r.dup; delete r.dupclub; (by[r.cls || ""] = by[r.cls || ""] || []).push(r); });
+  const pairs = [];
+  for (const cls in by){
+    const rs = by[cls].sort(cmpKey);
+    for (let i = 0; i + 1 < rs.length; i++){
+      const p = rs[i], q = rs[i+1], common = Object.keys(p._clubs).filter(k => k in q._clubs);
+      if (common.length){
+        const lab = common.sort().map(k => p._clubs[k]).join("／");
+        for (const x of [p, q]){ x.dup = true; x.dupclub = x.dupclub ? x.dupclub + "；" + lab : lab; }
+        pairs.push({cls, p, q, lab});
+      }
+    }
+  }
+  return pairs;
+}
+function reorder(rows, seed, iters, lottery){
+  const rng = mulberry32(seed), by = {};
+  rows.forEach(r => { delete r.moved; delete r.oldtime; delete r.seq; r.time = r.time0; });
+  // スタート時刻が未設定の行は、ファイル内の並び順をスタート順とみなして枠を割り当てる
+  rows.forEach(r => (by[r.cls || ""] = by[r.cls || ""] || []).push(r));
+  const changes = [];
+  for (const cls of Object.keys(by).sort()){
+    const rs = by[cls].sort(cmpKey), slots = rs.map(r => r.time);
+    const lab = (t, i) => t || `${i+1}番目`;
+    const origPos = new Map(rs.map((r, i) => [r, i]));   // 入力での枠位置（変更の判定・旧表示はこれを基準にする）
+    // 抽選：枠に入れる前に、クラス内の人の並びを無作為に（seed 固定）シャッフルしてから調整する
+    if (lottery){ for (let i = rs.length - 1; i > 0; i--){ const j = Math.floor(rng() * (i + 1)); [rs[i], rs[j]] = [rs[j], rs[i]]; } }
+    const [order] = solveClass(rs, iters, rng);
+    order.forEach((pi, si) => { const r = rs[pi], p0 = origPos.get(r); r.seq = si;
+      if (p0 !== si && (slots[si] !== r.time || !r.time)){ changes.push({cls, no: r.no, name: r.name, club: canonClub(r.club), old: lab(r.time, p0), new_: lab(slots[si], si), pos: si}); r.oldtime = lab(r.time, p0); r.moved = true; r.time = slots[si]; } });
+  }
+  return changes;
+}
+
+// ============================================================
+// 入力
+// ============================================================
+let SRC = null;      // {kind:"html"|"csv", html, m, data, name, header, records}
+let ROWS = [];
+let INPUT = [];
+let HIST = [], HISTIDX = -1, BASE_PAIRS = null;
+const drop = document.getElementById("drop"), fileInput = document.getElementById("file");
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); };
+fileInput.onchange = () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); fileInput.value = ""; };
+document.getElementById("ignore").value = DEFAULT_IGNORE;
+document.getElementById("useDict").addEventListener("change", () => { if (ROWS.length) runCheck(); });
+(function(){ const n = Object.keys(CLUB_DICT.display).length; document.getElementById("dictInfo").textContent = n ? `（${n} 件、${CLUB_DICT.since} 以後の実績データから）` : "（辞書は未埋め込み）"; })();
+// 同一視欄の既定値：埋め込み辞書の別名を「正表記=別表記=…」の行にする（利用者が編集できる）
+function defaultEquivText(){
+  const by = {};
+  for (const k in CLUB_DICT.aliases){ const t = CLUB_DICT.aliases[k]; (by[t] = by[t] || []).push(k); }
+  const disp = k => CLUB_DICT.display[k] || k;
+  return Object.keys(by).sort((a, b) => disp(a).localeCompare(disp(b), "ja")).map(t => [disp(t)].concat(by[t].map(disp)).join("=")).join("\n");
+}
+// 同一視設定の既定との差分を Google フォーム（別名読み替え辞書メンテナンス）に事前入力して開く。送信は利用者がフォーム上で行う
+const FEEDBACK_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSddA_2WwnT-ZQEudPpHhkDXK76Jg7hmyljAbxCXiI83botWRw/viewform";
+const FEEDBACK_ENTRY = "entry.588584108";   // 「辞書変更内容」（段落）
+function sendEquivDiff(){
+  const norm = t => t.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const cur = norm(document.getElementById("equiv").value), def = norm(defaultEquivText());
+  const defSet = new Set(def), curSet = new Set(cur);
+  const added = cur.filter(l => !defSet.has(l)), removed = def.filter(l => !curSet.has(l));
+  if (!added.length && !removed.length){ alert("同一視設定は既定のままです（送る差分がありません）"); return; }
+  const ev = document.getElementById("evname").value.trim();
+  const body = (ev ? `大会名: ${ev}\n` : "") + added.map(l => "+ " + l).concat(removed.map(l => "- " + l)).join("\n");
+  window.open(FEEDBACK_FORM + "?usp=pp_url&" + FEEDBACK_ENTRY + "=" + encodeURIComponent(body), "_blank");
+  ga("equiv_feedback", added.length + removed.length);
+}
+function resetEquiv(){ document.getElementById("equiv").value = defaultEquivText(); try { localStorage.removeItem("ggp.equiv"); } catch(e){} if (ROWS.length) runCheck(); }
+(function(){
+  let saved = null; try { saved = localStorage.getItem("ggp.equiv"); } catch(e){}
+  document.getElementById("equiv").value = saved !== null ? saved : defaultEquivText();
+  document.getElementById("equivKeep").checked = saved !== null;
+  const save = () => { try { if (document.getElementById("equivKeep").checked) localStorage.setItem("ggp.equiv", document.getElementById("equiv").value); else localStorage.removeItem("ggp.equiv"); } catch(e){} };
+  document.getElementById("equiv").addEventListener("input", save);
+  document.getElementById("equivKeep").addEventListener("change", save);
+})();
+
+function decode(buf){
+  const h = new Uint8Array(buf.slice(0, 2));
+  if (h[0] === 0xFF && h[1] === 0xFE) return new TextDecoder("utf-16le").decode(buf).replace(/^\uFEFF/, "");
+  if (h[0] === 0xFE && h[1] === 0xFF) return new TextDecoder("utf-16be").decode(buf).replace(/^\uFEFF/, "");
+  const u = new TextDecoder("utf-8", {fatal: false}).decode(buf);
+  if (!u.includes("�")) return u.replace(/^﻿/, "");
+  try { return new TextDecoder("shift_jis").decode(buf); } catch(e){ return u; }
+}
+async function loadFile(f){
+  const text = decode(await f.arrayBuffer());
+  HIST = []; HISTIDX = -1; BASE_PAIRS = null; document.getElementById("csvmap").style.display = "none";
+  if (/\.html?$/i.test(f.name) || /const DATA\s*=/.test(text)){
+    const m = /^const DATA = (\{.*\});\s*$/m.exec(text);
+    if (!m){ setInfo("HTML 内に DATA が見つかりません"); return; }
+    let data; try { data = JSON.parse(m[1]); } catch(e){ setInfo("DATA の JSON を読めません: " + e.message); return; }
+    SRC = {kind: "html", html: text, m, data, name: f.name};
+    setRows(data.rows.map(r => Object.assign({}, r)));
+    document.getElementById("evname").value = (data.title || "").replace(/スタートリスト.*$/, "").trim();
+    setInfo(`${f.name}：${ROWS.length} 名（HTML 形式）`);
+  } else if (isMulka(text)){
+    loadMulka(f.name, text);
+  } else if (isJoy(f.name, text)){
+    loadJoy(f.name, text);
+  } else {
+    const recs = parseCSV(text);
+    if (recs.length < 2){ setInfo("CSV に行がありません"); return; }
+    SRC = {kind: "csv", name: f.name, header: recs[0], records: recs.slice(1).filter(r => r.some(x => x.trim()))};
+    document.getElementById("evname").value = f.name.replace(/\.[^.]+$/, "");
+    buildMap(SRC.header);
+    document.getElementById("csvmap").style.display = "";
+    setInfo(`${f.name}：${SRC.records.length} 行（CSV）― 列の対応を確認して「この対応で読み込む」を押してください`);
+  }
+}
+// ---------- JOY（Japan-O-entrY）エントリーリスト ----------
+// 判定: ファイル名が NNNN_entrylist*.csv、または 1行目に「申込代表者」・2行目に「申込ID」がある
+// ---------- Mulka2 取り込み用スタートリスト（JOY2Mulka の Startlist.csv 形式） ----------
+// 1行目が「クラス,スタートナンバー,氏名１,氏名2,所属,スタート時刻,カード番号,カード備考,競技者登録番号」
+// 氏名１の「１」は全角・半角どちらも可。出力は同じ列構成で、スタート時刻だけ並べ替え後の値にする
+const MULKA_COLS = ["クラス", "スタートナンバー", "氏名１", "氏名2", "所属", "スタート時刻", "カード番号", "カード備考", "競技者登録番号"];
+function mulkaHeaderIndex(hdr){
+  const n = h => h.trim().replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  const H = hdr.map(n);
+  const idx = {}; MULKA_COLS.forEach(k => { idx[k] = H.indexOf(n(k)); });
+  return idx;
+}
+function isMulka(text){
+  const first = (text.split(/\r?\n/, 1)[0] || "");
+  if (!first.includes("スタートナンバー")) return false;
+  const idx = mulkaHeaderIndex(parseCSV(first)[0] || []);
+  return ["クラス", "スタートナンバー", "氏名１", "所属", "スタート時刻"].every(k => idx[k] >= 0);
+}
+function loadMulka(name, text){
+  const recs = parseCSV(text);
+  const hdr = recs[0], idx = mulkaHeaderIndex(hdr);
+  const g = (rec, k) => idx[k] >= 0 ? (rec[idx[k]] || "").trim() : "";
+  const rows = [];
+  recs.slice(1).forEach((rec, ri) => {
+    if (!rec.some(x => x && x.trim())) return;
+    rows.push({seqno: ri + 1, no: g(rec, "スタートナンバー"), cls: g(rec, "クラス"), course: "", name: g(rec, "氏名１"), kana: g(rec, "氏名2"),
+               club: g(rec, "所属"), time: g(rec, "スタート時刻"), card: g(rec, "カード番号"), cardnote: g(rec, "カード備考"), regno: g(rec, "競技者登録番号"), _rec: rec});
+  });
+  SRC = {kind: "mulka", name, header: hdr, idx};
+  document.getElementById("evname").value = name.replace(/\.[^.]+$/, "");
+  setRows(rows);
+  setInfo(`${name}：${ROWS.length} 名（Mulka2 スタートリスト形式）`);
+}
+function isJoy(name, text){
+  if (/^\d{4}_entrylist.*\.(csv|txt)$/i.test(name)) return true;
+  const ls = text.split(/\r?\n/, 2);
+  return ls.length >= 2 && ls[0].includes("申込代表者") && ls[1].includes("申込ID");
+}
+// 2行目を見出しとして読む。読み込む列: クラス・氏名1・氏名2・所属・申込ID・その他連絡事項・カード番号・登録番号
+// 出力は Mulka2 取り込み用 Startlist.csv 形式（MULKA_COLS）。スタートナンバーはクラス内連番を自動付与、スタート時刻・カード備考は空欄
+const JOY_OUT = ["クラス", "氏名1", "氏名2", "所属", "申込ID", "その他連絡事項"];
+function loadJoy(name, text){
+  const recs = parseCSV(text);
+  if (recs.length < 3){ setInfo("JOY エントリーリストの行が足りません"); return; }
+  const hdr = recs[1].map(h => h.trim());
+  const col = {}; JOY_OUT.forEach(k => { col[k] = hdr.indexOf(k); });
+  const missing = JOY_OUT.filter(k => col[k] < 0);
+  if (missing.length){ setInfo("JOY エントリーリストに列が見つかりません: " + missing.join("、")); return; }
+  // 「氏名1」が複数ある（リレー等の2人目以降）場合は、人ごとに1行にする
+  const nameCols = hdr.map((h, i) => h === "氏名1" ? i : -1).filter(i => i >= 0);
+  const rows = [];
+  // 各人ブロック（氏名1 から次の 氏名1 の手前まで）の中で カード番号・登録番号 の列を探す
+  const blockCol = (nc, label) => { const end = nameCols.find(i => i > nc) ?? hdr.length; for (let i = nc; i < end; i++) if (hdr[i] === label) return i; return -1; };
+  recs.slice(2).forEach((rec, ri) => {        // ri+1 = 入力ファイルの何番目のレコードか（SEQ）
+    if (!rec.some(x => x && x.trim())) return;
+    const cls = (rec[col["クラス"]] || "").trim(); if (!cls) return;
+    for (const nc of nameCols){
+      const nm = (rec[nc] || "").trim(); if (!nm) continue;
+      const ci = blockCol(nc, "カード番号"), gi = blockCol(nc, "登録番号");
+      rows.push({seqno: ri + 1, no: (rec[col["申込ID"]] || "").trim(), cls, course: "", name: nm, kana: (rec[nc + 1] || "").trim(),
+                 club: (rec[col["所属"]] || "").trim(), time: "", note: (rec[col["その他連絡事項"]] || "").trim(),
+                 card: ci >= 0 ? (rec[ci] || "").trim() : "", regno: gi >= 0 ? (rec[gi] || "").trim() : ""});
+    }
+  });
+  SRC = {kind: "joy", name, header: hdr, col};
+  document.getElementById("evname").value = name.replace(/\.[^.]+$/, "");
+  setRows(rows);
+  setInfo(`${name}：${ROWS.length} 名（JOY エントリーリスト。申込ID・クラス・氏名1・氏名2・所属・その他連絡事項を読み込み）`);
+}
+function parseCSV(text, sep){
+  if (!sep){ const l = text.split(/\r?\n/)[0] || ""; sep = (l.split("\t").length > l.split(",").length) ? "\t" : ","; }
+  const rows = [], n = text.length; let row = [], field = "", q = false, i = 0;
+  while (i < n){
+    const c = text[i];
+    if (q){ if (c === '"'){ if (text[i+1] === '"'){ field += '"'; i++; } else q = false; } else field += c; }
+    else if (c === '"') q = true;
+    else if (c === sep){ row.push(field); field = ""; }
+    else if (c === '\n' || c === '\r'){ if (c === '\r' && text[i+1] === '\n') i++; row.push(field); rows.push(row); row = []; field = ""; }
+    else field += c;
+    i++;
+  }
+  if (field !== "" || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+function buildMap(header){
+  const guess = {cls: /クラス|^cls$|class/i, name: /氏名|名前|^name$/i, club: /所属|クラブ|club/i, time: /スタート|時刻|^time$|start/i, no: /^no\.?$|ゼッケン|番号|bib/i, course: /レーン|コース|course/i};
+  for (const k in guess){
+    const sel = document.getElementById("m_" + k); sel.innerHTML = '<option value="">（なし）</option>';
+    header.forEach((h, idx) => { const o = document.createElement("option"); o.value = idx; o.textContent = h || `(列${idx+1})`; sel.appendChild(o); });
+    const hit = header.findIndex(h => guess[k].test(h)); if (hit >= 0) sel.value = hit;
+  }
+}
+function applyMap(){
+  const g = k => { const v = document.getElementById("m_" + k).value; return v === "" ? null : +v; };
+  const mi = {cls: g("cls"), name: g("name"), club: g("club"), time: g("time"), no: g("no"), course: g("course")};
+  if (mi.cls === null || mi.name === null || mi.club === null || mi.time === null){ setInfo("クラス・氏名・所属・スタート時刻の列を指定してください"); return; }
+  SRC.map = mi;
+  setRows(SRC.records.map((rec, ri) => ({seqno: ri + 1, no: mi.no === null ? "" : rec[mi.no] ?? "", cls: rec[mi.cls] ?? "", course: mi.course === null ? "" : rec[mi.course] ?? "", name: rec[mi.name] ?? "", club: rec[mi.club] ?? "", time: (rec[mi.time] ?? "").trim(), _rec: rec})));
+  document.getElementById("csvmap").style.display = "none";
+  setInfo(`${SRC.name}：${ROWS.length} 名（CSV）`);
+}
+function setRows(rows){
+  ROWS = rows; ROWS.forEach((r, i) => { r.time0 = r.time; if (r.seqno == null) r.seqno = i + 1; });
+  HIST = []; HISTIDX = -1; BASE_PAIRS = null;
+  ["btnCheck","btnReorder","btnVerify"].forEach(id => document.getElementById(id).disabled = false);
+  document.getElementById("verify").style.display = "none";
+  // 検証用に入力時点の内容（クラス・氏名・時刻の集合）を控えておく
+  INPUT = ROWS.map(r => ({seqno: r.seqno, name: r.name, cls: r.cls || "", time: r.time}));
+  ["btnNext","btnPrev","btnReset","btnDlHtml","btnDlCsv","btnDlList"].forEach(id => document.getElementById(id).disabled = true);
+  document.getElementById("histwrap").style.display = "none";
+  runCheck();
+}
+function setInfo(s){ document.getElementById("fileinfo").textContent = s; }
+
+// ============================================================
+// 実行
+// ============================================================
+// 所属統一の集計：置換パターン数（元の表記→正表記の組の種類）と、所属が変わる人数
+function renderUnify(){
+  const pats = new Set(); let people = 0;
+  for (const r of ROWS){
+    const o = String(r.club ?? "").trim(), c = canonClub(r.club);
+    if (o === c) continue;
+    people++;
+    const os = o.split(/[/／]/), cs = c.split("/");
+    os.forEach((x, i) => { if (x.trim() !== (cs[i] || "").trim()) pats.add(x.trim() + "→" + (cs[i] || "")); });
+  }
+  document.getElementById("unify").innerHTML = USE_DICT() ? `所属統一：<span class="stat">${pats.size}</span> パターン／<span class="stat">${people}</span> 名` : "所属統一：なし（辞書オフ）";
+}
+function runCheck(){
+  readSettings(); attachClubs(ROWS);
+  ROWS.forEach(r => { delete r.moved; delete r.oldtime; delete r.seq; r.time = r.time0; });
+  const pairs = markPairs(ROWS); BASE_PAIRS = pairs.length;
+  HIST = []; HISTIDX = -1;
+  render(pairs);
+  const empty = ROWS.filter(r => !Object.keys(r._clubs).length).length;
+  document.getElementById("status").innerHTML = `全 <span class="stat">${ROWS.length}</span> 名／連続ペア <span class="stat">${pairs.length}</span> 組／該当者 <span class="stat">${ROWS.filter(r => r.dup).length}</span> 名` + (empty ? `　<span class="small">（所属が空欄または判定対象外の人 ${empty} 名）</span>` : "");
+  renderUnify();
+  document.getElementById("histwrap").style.display = "none";
+  ["btnNext","btnPrev","btnReset","btnDlCsv","btnDlList"].forEach(id => document.getElementById(id).disabled = true);
+  document.getElementById("btnDlHtml").disabled = (SRC.kind !== "html");
+  document.getElementById("btnReset").disabled = true;
+  ga("check_run", pairs.length);
+}
+function runReorder(seedOverride){
+  readSettings(); attachClubs(ROWS);
+  if (BASE_PAIRS === null) BASE_PAIRS = markPairs(ROWS).length;
+  const seed = seedOverride ?? (+document.getElementById("seed").value || 0);
+  document.getElementById("seed").value = seed;
+  const lottery = document.getElementById("lottery").checked;
+  const changes = reorder(ROWS, seed, 30000, lottery);
+  const pairs = markPairs(ROWS);
+  const snap = ROWS.map(r => ({time: r.time, moved: !!r.moved, oldtime: r.oldtime}));
+  let idx = HIST.findIndex(h => h.seed === seed && h.lottery === lottery);
+  const entry = {seed, lottery, pairs: pairs.length, moved: changes.length, changes, snap};
+  if (idx >= 0) HIST[idx] = entry; else { HIST.push(entry); idx = HIST.length - 1; }
+  HISTIDX = idx;
+  showResult(entry, pairs);
+  ga("reorder_run", pairs.length);
+}
+function showResult(entry, pairs){
+  if (!pairs){ ROWS.forEach((r, i) => { r.time = entry.snap[i].time; r.moved = entry.snap[i].moved; r.oldtime = entry.snap[i].oldtime; }); pairs = markPairs(ROWS); }
+  document.getElementById("seed").value = entry.seed;
+  render(pairs);
+  document.getElementById("status").innerHTML = `seed <span class="stat">${entry.seed}</span>（${entry.lottery ? "抽選あり" : "抽選なし・入力順を基準"}）：連続ペア <span class="stat">${BASE_PAIRS}</span> 組 → <span class="stat">${entry.pairs}</span> 組／時刻変更 <span class="stat">${entry.moved}</span> 名／全 ${ROWS.length} 名`;
+  renderHist();
+  document.getElementById("histwrap").style.display = "";
+  document.getElementById("btnNext").disabled = false;
+  document.getElementById("btnPrev").disabled = HIST.length < 2;
+  document.getElementById("btnReset").disabled = false;
+  document.getElementById("btnDlHtml").disabled = (SRC.kind !== "html");
+  document.getElementById("btnDlCsv").disabled = false;
+  document.getElementById("btnDlList").disabled = false;
+}
+// ---------- 検証：入力にいた人が全員、同じクラスで出力に載っているか ----------
+function runVerify(){
+  const key = r => `${r.seqno}\u0000${r.name}`;
+  const inBy = {}, outBy = {};
+  INPUT.forEach(r => (inBy[r.cls] = inBy[r.cls] || []).push(r));
+  ROWS.forEach(r => (outBy[r.cls || ""] = outBy[r.cls || ""] || []).push(r));
+  const classes = [...new Set([...Object.keys(inBy), ...Object.keys(outBy)])].sort((a, b) => a.localeCompare(b, "ja", {numeric: true}));
+  const rows = []; let allOk = true;
+  for (const c of classes){
+    const i = inBy[c] || [], o = outBy[c] || [];
+    const iKeys = new Set(i.map(key)), oKeys = new Set(o.map(key));
+    const missing = i.filter(r => !oKeys.has(key(r))), extra = o.filter(r => !iKeys.has(key(r)));
+    // スタート枠（時刻の集合）が入力と同じか
+    const norm = a => a.map(r => r.time || "").sort().join("|");
+    const slotsOk = norm(i) === norm(o);
+    const ok = i.length === o.length && !missing.length && !extra.length && slotsOk;
+    if (!ok) allOk = false;
+    const why = [];
+    if (missing.length) why.push("出力にいない: " + missing.map(r => r.name).join("、"));
+    if (extra.length) why.push("入力にいない: " + extra.map(r => r.name).join("、"));
+    if (!slotsOk) why.push("スタート枠が入力と一致しない");
+    rows.push(`<tr><td>${esc(c || "(クラスなし)")}</td><td class="num">${i.length}</td><td class="num">${o.length}</td><td class="${ok ? "ok" : "ng"}">${ok ? "OK" : "NG"}</td><td>${esc(why.join("／"))}</td></tr>`);
+  }
+  const v = document.getElementById("verify");
+  v.innerHTML = `<div><b>検証結果：</b><span class="${allOk ? "ok" : "ng"}">${allOk ? "OK ― 入力の全員が同じクラスで出力に載っており、各クラスのスタート枠も入力と一致しています" : "NG ― 不一致があります"}</span>　<span class="small">（入力 ${INPUT.length} 名／出力 ${ROWS.length} 名／${classes.length} クラス）</span></div>` +
+    `<table><tr><th>クラス</th><th>入力</th><th>出力</th><th>判定</th><th>内容</th></tr>${rows.join("")}</table>`;
+  v.style.display = "";
+  ga("verify_run", allOk ? 1 : 0);
+}
+function nextSeed(){ const mx = HIST.length ? Math.max(...HIST.map(h => h.seed)) : (+document.getElementById("seed").value || 0); runReorder(mx + 1); }
+function prevSeed(){ if (HISTIDX > 0){ HISTIDX--; showResult(HIST[HISTIDX]); } }
+function resetOrder(){ runCheck(); }
+function renderHist(){
+  const t = document.getElementById("hist");
+  t.innerHTML = "<tr><th>seed</th><th>抽選</th><th>連続</th><th>変更</th></tr>" + HIST.map((h, i) => `<tr class="${i === HISTIDX ? "cur" : ""}" style="cursor:pointer" onclick="HISTIDX=${i};showResult(HIST[${i}])"><td>${h.seed}</td><td>${h.lottery ? "あり" : "なし"}</td><td>${h.pairs}</td><td>${h.moved}</td></tr>`).join("");
+}
+
+// ============================================================
+// 表示
+// ============================================================
+// クラス色（スタートリスト HTML と同じ）: 男子=水色、女子=マゼンタ、その他=グレー
+const DEF = {M:{stripe:"#eaf5fc", title:"#b9dcf2"}, W:{stripe:"#fdeaf7", title:"#f3b9e2"}, O:{stripe:"#f2f2f2", title:"#d5d5d5"}};
+function colorsOf(g){ const c = (g||"").charAt(0).toUpperCase(); return DEF[c === "M" || c === "W" ? c : "O"]; }
+const COLS = [["pos","順"],["time","スタート"],["name","氏名"],["club","所属"],["no","No"],["seqno","SEQ"]];
+function render(pairs){
+  const hasCourse = ROWS.some(r => r.course), hasNote = ROWS.some(r => r.note);
+  const cols = COLS.concat(hasCourse ? [["course","レーン"]] : [], hasNote ? [["note","連絡事項"]] : []);
+  document.getElementById("hdr").innerHTML = cols.map(c => `<th>${c[1]}</th>`).join("");
+  const by = {}; ROWS.forEach(r => (by[r.cls || ""] = by[r.cls || ""] || []).push(r));
+  const groups = Object.keys(by).sort((a, b) => a.localeCompare(b, "ja", {numeric: true}));
+  const parts = [];
+  for (const g of groups){
+    const rs = by[g].sort(cmpKey);
+    const col = colorsOf(g);
+    parts.push(`<tr class="gtitle" style="background:${col.title}"><td colspan="${cols.length}">${esc(g || "(クラスなし)")}<span class="small" style="margin-left:10px">${rs.length}名</span></td></tr>`);
+    rs.forEach((r, idx) => { r._pos = idx + 1; });
+    for (const r of rs){
+      const kl = [r.dup ? "dup" : "", r.moved ? "moved" : ""].filter(Boolean).join(" ");
+      const bg = r._pos % 2 === 0 ? ` style="background:${col.stripe}"` : "";
+      parts.push(`<tr${kl ? ` class="${kl}"` : ""}${bg}>` + cols.map(([k]) => {
+        if (k === "pos") return `<td class="num">${r._pos}</td>`;
+        if (k === "time") return `<td class="time">${esc(r.time)}${r.moved && r.time0 ? ` <span class="old">(旧 ${esc(r.oldtime)})</span>` : ""}</td>`;
+        if (k === "club"){
+          const al = aliasNote(r.club);
+          return `<td class="club">${esc(r.club)}${al ? ` <span class="why dict">▶ ${esc(al)}</span>` : ""}${r.dup ? ` <span class="why">◀ ${esc(r.dupclub)}</span>` : ""}</td>`;
+        }
+        if (k === "note") return `<td class="note">${esc(r.note)}</td>`;
+        return `<td class="${k === "no" ? "num" : k === "seqno" ? "num seq" : ""}">${esc(r[k])}</td>`;
+      }).join("") + "</tr>");
+    }
+  }
+  document.getElementById("body").innerHTML = parts.join("");
+  document.getElementById("tbl").classList.toggle("hasnote", hasNote);
+  document.getElementById("pairs").innerHTML = pairs.length ? pairs.map(p => `${esc(p.cls)}　${esc(p.p.time)} ${esc(p.p.name)} ― ${esc(p.q.time)} ${esc(p.q.name)}　[${esc(p.lab)}]`).join("<br>") : "（なし）";
+}
+
+// ============================================================
+// ダウンロード
+// ============================================================
+function dl(name, text, type){
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿" + text], {type})); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function csvLine(arr){ return arr.map(v => { v = String(v ?? ""); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(","); }
+function stem(){ return (SRC.name || "startlist").replace(/\.[^.]+$/, ""); }
+function downloadChanges(){
+  const h = HIST[HISTIDX]; if (!h) return;
+  const lines = [csvLine(["# 大会名", document.getElementById("evname").value, "seed", h.seed, "抽選", h.lottery ? "あり" : "なし", "連続ペア", `${BASE_PAIRS}→${h.pairs}`, "時刻変更", h.moved])];
+  lines.push(csvLine(["クラス","No","氏名","所属","旧スタート","新スタート"]));
+  h.changes.slice().sort((a, b) => a.cls.localeCompare(b.cls, "ja", {numeric: true}) || (a.pos ?? 0) - (b.pos ?? 0)).forEach(c => lines.push(csvLine([c.cls, c.no, c.name, c.club, c.old, c.new_])));
+  dl(stem() + "_changes.csv", lines.join("\r\n"), "text/csv"); ga("download", "changes");
+}
+function downloadList(){
+  const lines = [];
+  if (SRC.kind === "mulka"){
+    // 元の列構成のまま、スタート時刻だけ差し替える（元が HH:MM:SS なら秒を保つ）
+    lines.push(csvLine(SRC.header));
+    const ti = SRC.idx["スタート時刻"], cli = SRC.idx["所属"];
+    ROWS.slice().sort((a, b) => (a.cls||"").localeCompare(b.cls||"", "ja", {numeric:true}) || cmpKey(a, b)).forEach(r => { const rec = r._rec.slice(); rec[ti] = r.time; rec[cli] = canonClub(r.club); lines.push(csvLine(rec)); });
+    dl("Startlist.csv", lines.join("\r\n"), "text/csv"); ga("download", "mulka"); return;
+  }
+  if (SRC.kind === "joy"){
+    // JOY エントリー → Mulka2 Startlist.csv 形式。スタートナンバー＝クラス内連番（出力順）、スタート時刻・カード備考＝空欄
+    lines.push(csvLine(MULKA_COLS));
+    let prev = null, n = 0;
+    ROWS.slice().sort((a, b) => (a.cls||"").localeCompare(b.cls||"", "ja", {numeric:true}) || cmpKey(a, b)).forEach(r => {
+      n = (r.cls === prev) ? n + 1 : 1; prev = r.cls;
+      lines.push(csvLine([r.cls, n, r.name, r.kana, canonClub(r.club), r.time || "", r.card || "", "", r.regno || ""]));
+    });
+    dl("Startlist.csv", lines.join("\r\n"), "text/csv"); ga("download", "joy2mulka"); return;
+  } else if (SRC.kind === "csv"){
+    lines.push(csvLine(SRC.header));
+    const mi = SRC.map;
+    ROWS.slice().sort((a, b) => (a.cls||"").localeCompare(b.cls||"", "ja", {numeric:true}) || cmpKey(a, b)).forEach(r => { const rec = r._rec.slice(); rec[mi.time] = r.time; rec[mi.club] = canonClub(r.club); lines.push(csvLine(rec)); });
+  } else {
+    lines.push(csvLine(["No","クラス","レーン","スタート","氏名","所属","ふりがな","カード番号","カード備考","バス"]));
+    ROWS.slice().sort((a, b) => (a.cls||"").localeCompare(b.cls||"", "ja", {numeric:true}) || cmpKey(a, b)).forEach(r => lines.push(csvLine([r.no, r.cls, r.course, r.time, r.name, canonClub(r.club), r.kana, r.card, r.cardnote, r.bus])));
+  }
+  dl(stem() + "_reordered.csv", lines.join("\r\n"), "text/csv"); ga("download", "list");
+}
+function downloadHtml(){
+  if (SRC.kind !== "html") return;
+  const data = JSON.parse(JSON.stringify(SRC.data));
+  // 時刻未設定でも並び順が伝わるよう、クラス→新しい順で書き出す
+  data.rows = ROWS.slice().sort((x, y) => (x.cls||"").localeCompare(y.cls||"", "ja", {numeric:true}) || cmpKey(x, y)).map(r => { const o = {}; for (const k in r) if (!k.startsWith("_") && k !== "time0") o[k] = r[k]; o.club = canonClub(r.club); if (o.club !== String(r.club ?? "").trim()) o.club0 = r.club; delete o.oldtime; return o; });
+  const head = SRC.m.index + "const DATA = ".length;
+  let html = SRC.html.slice(0, head) + JSON.stringify(data) + SRC.html.slice(head + SRC.m[1].length);
+  html = patchRender(html);
+  const suffix = HIST[HISTIDX] ? "_reordered" : "_marked";
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([html], {type: "text/html"})); a.download = stem() + suffix + ".html"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  ga("download", "html");
+}
+// 元のスタートリスト HTML に、赤字・青字表示の CSS/JS を追加（mark_same_club.py の patch_render と同じ）
+function patchRender(html){
+  html = html.replace("</style>", 'tr.dup td{color:#c00;font-weight:bold}\ntr.moved td.time{color:#1a5fb4}\ntd.club .why{font-weight:normal;font-size:11px}\ntd.club .dict{color:#1b5e20;font-weight:bold}\n@media print{tr.dup td{color:#c00 !important}}\n</style>');
+  html = html.replace('      const mine = me && r._i===me._i ? \' class="mine"\' : "";',
+    '      const klass = [me && r._i===me._i ? "mine" : "", r.dup ? "dup" : "", r.moved ? "moved" : ""].filter(Boolean).join(" ");\n      const mine = klass ? ` class="${klass}"` : "";');
+  html = html.replace('        return `<td class="${c.td||""}">${esc(v)}</td>`; }).join("")+`</tr>`);',
+    '        let extra = "", tail = "";\n        if(c.key==="club"){ if(r.club0 && r.club0!==r.club) tail += ` <span class="why dict">▶ 元 ${esc(r.club0)}</span>`; if(r.dup) tail += ` <span class="why">◀ ${esc(r.dupclub||"")}</span>`; }\n        return `<td class="${c.td||""}${c.key==="club"?" club":""}"${extra}>${esc(v)}${tail}</td>`; }).join("")+`</tr>`);');
+  html = html.replace("<title>スタートリスト</title>", "<title>スタートリスト（同一所属チェック済み）</title>");
+  return html;
+}
+// Google Analytics へのイベント送信（gtag が読み込まれているときだけ。大会名と件数のみ送る）
+function ga(name, value){
+  if (typeof gtag !== "function") return;
+  try { gtag("event", name, {event_label: (document.getElementById("evname").value || "").slice(0, 100), value: typeof value === "number" ? value : undefined, item: typeof value === "string" ? value : undefined, rows: ROWS.length}); } catch(e){}
+}
+</script>
+</body>
+</html>
